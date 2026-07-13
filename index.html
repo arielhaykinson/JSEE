@@ -473,43 +473,7 @@ const store = {
   async updateTask(id,d){ const t=store.task(id); if(!t) return; Object.assign(t,d); emit();
     if(CONNECTED){ const {error}=await sb.from('tasks').update(taskToRow(t)).eq('id',id); if(error) fail(error); } },
   async deleteTask(id){ tasks=tasks.filter(t=>t.id!==id); emit();
-    if(CONNECTED){ const {error}=await sb.from('tasks').delete().eq('id',id); if(error) fail(error); } },
-
-  // local demo data (only used when NOT connected)
-  seed(){
-    const M=(name,role)=>{const o={id:uid(),name,role};members.push(o);return o;};
-    const E=(o)=>{const e={id:uid(),tasks:[],status:'planning',...o};events.push(e);return e;};
-    const S=(o)=>{speakers.push({id:uid(),stage:'idea',...o});};
-    const T=(o)=>{tasks.push({id:uid(),done:false,...o});};
-
-    const pres=M('Ariel','President'), vp=M('Vice President','VP'),
-          treas=M('Treasurer','Budget & finances'), sec=M('Secretary','Records & comms'),
-          memb=M('Membership Director','Members & recruiting'),
-          accom=M('Accommodations Officer','Venues & logistics'),
-          bizrel=M('Director of Business Relations','Speaker & sponsor outreach');
-
-    const oct21=E({title:'Steve Miller — Origin Ventures',type:'speaker',date:'2026-10-21',time:'18:00',
-      location:'ECEB 1002',status:'confirmed',
-      notes:'Topics: his career path, AI infrastructure, and building AI-native startups.',
-      tasks:[{t:'Confirm room booking',done:true,owner:accom.id},{t:'Send calendar invite to members',done:false,owner:sec.id},
-             {t:'Prep intro + Q&A questions',done:false,owner:pres.id},{t:'Order refreshments',done:false,owner:treas.id}]});
-    S({name:'Steve Miller',org:'Origin Ventures',contact:'',topics:'Career, AI infrastructure, AI-native startups',
-      notes:'Confirmed for Oct 21.',stage:'confirmed',eventId:oct21.id,owner:bizrel.id});
-    S({name:'Al Goldstein',org:'Prior keynote',contact:'',topics:'Entrepreneurship / fintech',
-      notes:'Past keynote — inspired the current outreach push. Possible return invite.',stage:'done',eventId:null,owner:null});
-    S({name:'(prospect)',org:'Aerospace / hardware founder',contact:'',topics:'Deep-tech, propulsion, hard-tech startups',
-      notes:'Idea stage — good fit for the engineering side of the club.',stage:'idea',eventId:null,owner:bizrel.id});
-    E({title:'Officer sync',type:'meeting',date:isoOffset(3),time:'19:00',location:'Grainger 2nd floor',status:'planning',
-      notes:'Plan fall semester speaker cadence.',
-      tasks:[{t:'Draft semester calendar',done:false,owner:pres.id},{t:'Divide outreach targets',done:false,owner:bizrel.id},
-             {t:'Confirm recurring meeting room',done:false,owner:accom.id}]});
-    E({title:'Exec board meeting',type:'exec',date:'2026-10-07',time:'18:30',location:'Grainger 3341',status:'confirmed',
-      notes:'Monthly exec board check-in. Budget review, event pipeline, membership numbers.',
-      tasks:[{t:'Circulate agenda',done:false,owner:sec.id},{t:'Budget snapshot',done:false,owner:treas.id},
-             {t:'Membership update',done:false,owner:memb.id}]});
-    T({t:'Renew club registration with SORF',owner:treas.id,cat:'finance',due:isoOffset(10)});
-    T({t:'Post recap of last event to Instagram',owner:memb.id,cat:'marketing',due:null});
-  }
+    if(CONNECTED){ const {error}=await sb.from('tasks').delete().eq('id',id); if(error) fail(error); } }
 };
 
 /* helpers */
@@ -1241,8 +1205,10 @@ async function startApp(){
 }
 
 async function boot(){
-  if(!CONNECTED){                    // local demo mode (e.g. the in-app preview)
-    setFooter(false); store.seed(); calDate=new Date(2026,9,1); render(); return;
+  if(!CONNECTED){                    // no Supabase keys yet — empty, nothing saved
+    setFooter(false); calDate=new Date(2026,9,1); render();
+    toast('Not connected — add your Supabase URL and key to save data');
+    return;
   }
   if(!window.supabase){ toast('Could not load Supabase library'); return; }
   sb=window.supabase.createClient(CONFIG.url,CONFIG.key);
