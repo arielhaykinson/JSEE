@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root{
     --bg:#f4f5f8; --surface:#ffffff; --surface-2:#fafbfc;
@@ -237,6 +238,23 @@
   .mledit .del:hover{background:var(--s-declined-bg);color:var(--s-declined)}
   .mledit .del.armed{width:auto;padding:0 10px;font-size:11px;font-weight:700;background:var(--s-declined-bg);color:var(--s-declined)}
 
+  /* ---- login gate ---- */
+  .authgate{position:fixed;inset:0;z-index:100;background:var(--bg);display:none;align-items:center;justify-content:center;padding:24px}
+  .authgate.open{display:flex}
+  .authcard{background:var(--surface);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow-lg);width:100%;max-width:360px;padding:32px 28px;display:flex;flex-direction:column;gap:12px}
+  .authcard h2{font-family:var(--display);font-size:24px;font-weight:700;text-align:center}
+  .authcard p{font-size:13px;color:var(--ink-soft);text-align:center;margin-bottom:8px}
+  .authcard input{padding:11px 13px;border:1px solid var(--line-strong);border-radius:10px;font-size:14px}
+  .authcard input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft)}
+  .au-alt{color:var(--primary);font-weight:600;font-size:13px;padding:4px}
+  .au-alt:hover{text-decoration:underline}
+  .au-msg{font-size:12.5px;color:var(--ink-soft);text-align:center;min-height:16px}
+
+  /* ---- toast ---- */
+  #toast{position:fixed;left:50%;bottom:28px;transform:translate(-50%,20px);z-index:200;background:var(--ink);color:#fff;
+    font-size:13px;font-weight:500;padding:11px 18px;border-radius:10px;box-shadow:var(--shadow-lg);opacity:0;pointer-events:none;transition:.2s}
+  #toast.show{opacity:1;transform:translate(-50%,0)}
+
   /* ---- mobile bottom nav ---- */
   .mobilenav{display:none}
 
@@ -280,7 +298,7 @@
         Speaker pipeline
       </button>
     </nav>
-    <div class="side-foot">
+    <div class="side-foot" id="sideFoot">
       <b>Frontend preview.</b> Data lives in this browser session for now — resets on reload. The store layer is built to swap for a shared backend next.
     </div>
   </aside>
@@ -321,110 +339,178 @@
 <!-- modal mount -->
 <div class="scrim" id="scrim"><div id="modalMount"></div></div>
 
+<!-- login gate (shown only when connected to Supabase and signed out) -->
+<div class="authgate" id="authgate">
+  <div class="authcard">
+    <h2>JSEE Ops</h2>
+    <p>Sign in with your board account</p>
+    <input id="au-email" type="email" placeholder="Email" autocomplete="email">
+    <input id="au-pass" type="password" placeholder="Password" autocomplete="current-password">
+    <button class="btn btn-primary" id="au-signin" style="width:100%;justify-content:center">Sign in</button>
+    <button class="au-alt" id="au-signup">Create an account</button>
+    <div class="au-msg" id="au-msg"></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
 <script>
 /* =========================================================================
-   DATA LAYER  — single source of truth.
-   Everything goes through `store`. Swapping this object's method bodies for
-   Supabase (or any API) later means the UI code below never changes.
+   DATA LAYER — cache-backed, Supabase-synced.
+   Reads serve from an in-memory cache (so all UI code stays synchronous).
+   Writes update the cache + emit immediately, then persist to Supabase.
+   Realtime keeps every officer's cache in sync. If Supabase isn't configured,
+   it falls back to local demo mode so the app still runs.
+   ------------------------------------------------------------------------
+   >>> TO CONNECT YOUR OWN SHARED BACKEND, fill these two values:
    ========================================================================= */
-const store = (() => {
-  let events = [];     // {id,title,type,date,time,location,notes,status,tasks:[{t,done,owner}],speakerId}
-  let speakers = [];    // {id,name,org,contact,topics,notes,stage,eventId,owner}
-  let members = [];     // {id,name,role}
-  let tasks = [];       // standalone to-dos {id,t,done,owner,due}
-  let _id = 1;
-  const uid = () => 'x' + (_id++);
-  const emit = () => document.dispatchEvent(new Event('store:change'));
+const CONFIG = {
+  url: 'https://YOUR-PROJECT.supabase.co',   // Supabase → Project Settings → API → Project URL
+  key: 'YOUR-ANON-KEY'                        // Supabase → Project Settings → API → anon public key
+};
+const CONNECTED = !CONFIG.url.includes('YOUR-') && !CONFIG.key.includes('YOUR-');
 
-  return {
-    // reads
-    events: () => [...events],
-    speakers: () => [...speakers],
-    members: () => [...members],
-    tasks: () => [...tasks],
-    event: id => events.find(e => e.id === id),
-    speaker: id => speakers.find(s => s.id === id),
-    member: id => members.find(mm => mm.id === id),
-    task: id => tasks.find(t => t.id === id),
-    eventsOn: iso => events.filter(e => e.date === iso),
+let sb = null;                 // supabase client (set in boot)
+let events=[], speakers=[], members=[], tasks=[];
+let _id=1; const uid=()=>'x'+(_id++);
+const emit=()=>document.dispatchEvent(new Event('store:change'));
+function fail(err){ console.error(err); toast('Could not save — check your connection'); }
 
-    // event writes
-    addEvent(d){ const e={id:uid(),tasks:[],status:'planning',...d}; events.push(e); emit(); return e; },
-    updateEvent(id,d){ const e=store.event(id); if(e){Object.assign(e,d); emit();} },
-    setEventTaskDone(eventId,taskIndex,done){ const e=store.event(eventId);
-      if(e&&e.tasks&&e.tasks[taskIndex]){ e.tasks[taskIndex].done=done; emit(); } },
-    deleteEvent(id){ events=events.filter(e=>e.id!==id);
-      speakers.forEach(s=>{ if(s.eventId===id) s.eventId=null; }); emit(); },
+/* row <-> app-object mappers (DB uses snake_case; UI keeps its existing keys) */
+const eventToRow  = e => ({title:e.title,type:e.type,event_date:e.date||null,time_str:e.time||null,location:e.location||null,notes:e.notes||null,status:e.status||'planning',tasks:e.tasks||[]});
+const rowToEvent  = r => ({id:r.id,title:r.title,type:r.type,date:r.event_date,time:r.time_str,location:r.location,notes:r.notes,status:r.status,tasks:r.tasks||[]});
+const speakerToRow= s => ({name:s.name,org:s.org,contact:s.contact,topics:s.topics,notes:s.notes,stage:s.stage,event_id:s.eventId||null,owner:s.owner||null});
+const rowToSpeaker= r => ({id:r.id,name:r.name,org:r.org,contact:r.contact,topics:r.topics,notes:r.notes,stage:r.stage,eventId:r.event_id,owner:r.owner});
+const memberToRow = m => ({name:m.name,role:m.role});
+const rowToMember = r => ({id:r.id,name:r.name,role:r.role});
+const taskToRow   = t => ({body:t.t,done:!!t.done,owner:t.owner||null,cat:t.cat||'general',due:t.due||null});
+const rowToTask   = r => ({id:r.id,t:r.body,done:r.done,owner:r.owner,cat:r.cat,due:r.due});
 
-    // speaker writes
-    addSpeaker(d){ const s={id:uid(),stage:'idea',...d}; speakers.push(s); emit(); return s; },
-    updateSpeaker(id,d){ const s=store.speaker(id); if(s){Object.assign(s,d); emit();} },
-    deleteSpeaker(id){ speakers=speakers.filter(s=>s.id!==id); emit(); },
+async function loadAll(){
+  const [ev,sp,me,ta] = await Promise.all([
+    sb.from('events').select('*'),
+    sb.from('speakers').select('*'),
+    sb.from('members').select('*'),
+    sb.from('tasks').select('*'),
+  ]);
+  if(ev.error||sp.error||me.error||ta.error){ fail(ev.error||sp.error||me.error||ta.error); return; }
+  events   = (ev.data||[]).map(rowToEvent);
+  speakers = (sp.data||[]).map(rowToSpeaker);
+  members  = (me.data||[]).map(rowToMember);
+  tasks    = (ta.data||[]).map(rowToTask);
+}
+let _rtSubscribed=false;
+function subscribeRealtime(){
+  if(_rtSubscribed) return; _rtSubscribed=true;
+  ['events','speakers','members','tasks'].forEach(t=>{
+    sb.channel('rt-'+t)
+      .on('postgres_changes',{event:'*',schema:'public',table:t},async()=>{ await loadAll(); emit(); })
+      .subscribe();
+  });
+}
 
-    // member writes
-    addMember(d){ const mm={id:uid(),...d}; members.push(mm); emit(); return mm; },
-    updateMember(id,d){ const mm=store.member(id); if(mm){Object.assign(mm,d); emit();} },
-    deleteMember(id){ members=members.filter(mm=>mm.id!==id);
-      // unassign anything owned by this member
-      events.forEach(e=>(e.tasks||[]).forEach(t=>{ if(t.owner===id) t.owner=null; }));
-      speakers.forEach(s=>{ if(s.owner===id) s.owner=null; });
-      tasks.forEach(t=>{ if(t.owner===id) t.owner=null; }); emit(); },
+const store = {
+  // reads (from cache)
+  events: () => [...events],
+  speakers: () => [...speakers],
+  members: () => [...members],
+  tasks: () => [...tasks],
+  event: id => events.find(e => e.id === id),
+  speaker: id => speakers.find(s => s.id === id),
+  member: id => members.find(mm => mm.id === id),
+  task: id => tasks.find(t => t.id === id),
+  eventsOn: iso => events.filter(e => e.date === iso),
 
-    // standalone task writes
-    addTask(d){ const t={id:uid(),done:false,...d}; tasks.push(t); emit(); return t; },
-    updateTask(id,d){ const t=store.task(id); if(t){Object.assign(t,d); emit();} },
-    deleteTask(id){ tasks=tasks.filter(t=>t.id!==id); emit(); },
+  // event writes
+  async addEvent(d){ const rec={tasks:[],status:'planning',...d};
+    if(CONNECTED){ const {data,error}=await sb.from('events').insert(eventToRow(rec)).select().single();
+      if(error) return fail(error); events.push(rowToEvent(data)); }
+    else { events.push({id:uid(),...rec}); } emit(); },
+  async updateEvent(id,d){ const e=store.event(id); if(!e) return; Object.assign(e,d); emit();
+    if(CONNECTED){ const {error}=await sb.from('events').update(eventToRow(e)).eq('id',id); if(error) fail(error); } },
+  async setEventTaskDone(eventId,taskIndex,done){ const e=store.event(eventId);
+    if(!(e&&e.tasks&&e.tasks[taskIndex])) return; e.tasks[taskIndex].done=done; emit();
+    if(CONNECTED){ const {error}=await sb.from('events').update({tasks:e.tasks}).eq('id',eventId); if(error) fail(error); } },
+  async deleteEvent(id){ events=events.filter(e=>e.id!==id);
+    speakers.forEach(s=>{ if(s.eventId===id) s.eventId=null; }); emit();
+    if(CONNECTED){ await sb.from('events').delete().eq('id',id); await sb.from('speakers').update({event_id:null}).eq('event_id',id); } },
 
-    seed(){
-      const pres   = store.addMember({name:'Ariel',                 role:'President'});
-      const vp     = store.addMember({name:'Vice President',         role:'VP'});
-      const treas  = store.addMember({name:'Treasurer',             role:'Budget & finances'});
-      const sec    = store.addMember({name:'Secretary',             role:'Records & comms'});
-      const memb   = store.addMember({name:'Membership Director',   role:'Members & recruiting'});
-      const accom  = store.addMember({name:'Accommodations Officer',role:'Venues & logistics'});
-      const bizrel = store.addMember({name:'Director of Business Relations',role:'Speaker & sponsor outreach'});
+  // speaker writes
+  async addSpeaker(d){ const rec={stage:'idea',...d};
+    if(CONNECTED){ const {data,error}=await sb.from('speakers').insert(speakerToRow(rec)).select().single();
+      if(error) return fail(error); speakers.push(rowToSpeaker(data)); }
+    else { speakers.push({id:uid(),...rec}); } emit(); },
+  async updateSpeaker(id,d){ const s=store.speaker(id); if(!s) return; Object.assign(s,d); emit();
+    if(CONNECTED){ const {error}=await sb.from('speakers').update(speakerToRow(s)).eq('id',id); if(error) fail(error); } },
+  async deleteSpeaker(id){ speakers=speakers.filter(s=>s.id!==id); emit();
+    if(CONNECTED){ const {error}=await sb.from('speakers').delete().eq('id',id); if(error) fail(error); } },
 
-      const oct21 = store.addEvent({title:'Steve Miller — Origin Ventures',type:'speaker',
-        date:'2026-10-21',time:'18:00',location:'ECEB 1002',status:'confirmed',
-        notes:'Topics: his career path, AI infrastructure, and building AI-native startups.',
-        tasks:[
-          {t:'Confirm room booking',done:true,owner:accom.id},
-          {t:'Send calendar invite to members',done:false,owner:sec.id},
-          {t:'Prep intro + Q&A questions',done:false,owner:pres.id},
-          {t:'Order refreshments',done:false,owner:treas.id},
-        ]});
-      store.addSpeaker({name:'Steve Miller',org:'Origin Ventures',contact:'',
-        topics:'Career, AI infrastructure, AI-native startups',notes:'Confirmed for Oct 21.',
-        stage:'confirmed',eventId:oct21.id,owner:bizrel.id});
-      store.addSpeaker({name:'Al Goldstein',org:'Prior keynote',contact:'',
-        topics:'Entrepreneurship / fintech',notes:'Past keynote — inspired the current outreach push. Possible return invite.',
-        stage:'done',eventId:null,owner:null});
-      store.addSpeaker({name:'(prospect)',org:'Aerospace / hardware founder',contact:'',
-        topics:'Deep-tech, propulsion, hard-tech startups',notes:'Idea stage — good fit for the engineering side of the club.',
-        stage:'idea',eventId:null,owner:bizrel.id});
-      store.addEvent({title:'Officer sync',type:'meeting',date:isoOffset(3),time:'19:00',
-        location:'Grainger 2nd floor',status:'planning',
-        notes:'Plan fall semester speaker cadence.',
-        tasks:[
-          {t:'Draft semester calendar',done:false,owner:pres.id},
-          {t:'Divide outreach targets',done:false,owner:bizrel.id},
-          {t:'Confirm recurring meeting room',done:false,owner:accom.id},
-        ]});
-      store.addEvent({title:'Exec board meeting',type:'exec',date:'2026-10-07',time:'18:30',
-        location:'Grainger 3341',status:'confirmed',
-        notes:'Monthly exec board check-in. Budget review, event pipeline, membership numbers.',
-        tasks:[
-          {t:'Circulate agenda',done:false,owner:sec.id},
-          {t:'Budget snapshot',done:false,owner:treas.id},
-          {t:'Membership update',done:false,owner:memb.id},
-        ]});
+  // member writes
+  async addMember(d){ const rec={...d};
+    if(CONNECTED){ const {data,error}=await sb.from('members').insert(memberToRow(rec)).select().single();
+      if(error) return fail(error); members.push(rowToMember(data)); }
+    else { members.push({id:uid(),...rec}); } emit(); },
+  async updateMember(id,d){ const mm=store.member(id); if(!mm) return; Object.assign(mm,d); emit();
+    if(CONNECTED){ const {error}=await sb.from('members').update(memberToRow(mm)).eq('id',id); if(error) fail(error); } },
+  async deleteMember(id){ members=members.filter(mm=>mm.id!==id);
+    const changedEvents=[];
+    events.forEach(e=>{ let ch=false; (e.tasks||[]).forEach(t=>{ if(t.owner===id){t.owner=null;ch=true;} }); if(ch) changedEvents.push(e); });
+    speakers.forEach(s=>{ if(s.owner===id) s.owner=null; });
+    tasks.forEach(t=>{ if(t.owner===id) t.owner=null; });
+    emit();
+    if(CONNECTED){
+      await sb.from('members').delete().eq('id',id);
+      await sb.from('speakers').update({owner:null}).eq('owner',id);
+      await sb.from('tasks').update({owner:null}).eq('owner',id);
+      for(const e of changedEvents){ await sb.from('events').update({tasks:e.tasks}).eq('id',e.id); }
+    } },
 
-      // standalone (not tied to an event) to-dos
-      store.addTask({t:'Renew club registration with SORF',owner:treas.id,cat:'finance',due:isoOffset(10)});
-      store.addTask({t:'Post recap of last event to Instagram',owner:memb.id,cat:'marketing',due:null});
-    }
-  };
-})();
+  // standalone task writes
+  async addTask(d){ const rec={done:false,...d};
+    if(CONNECTED){ const {data,error}=await sb.from('tasks').insert(taskToRow(rec)).select().single();
+      if(error) return fail(error); tasks.push(rowToTask(data)); }
+    else { tasks.push({id:uid(),...rec}); } emit(); },
+  async updateTask(id,d){ const t=store.task(id); if(!t) return; Object.assign(t,d); emit();
+    if(CONNECTED){ const {error}=await sb.from('tasks').update(taskToRow(t)).eq('id',id); if(error) fail(error); } },
+  async deleteTask(id){ tasks=tasks.filter(t=>t.id!==id); emit();
+    if(CONNECTED){ const {error}=await sb.from('tasks').delete().eq('id',id); if(error) fail(error); } },
+
+  // local demo data (only used when NOT connected)
+  seed(){
+    const M=(name,role)=>{const o={id:uid(),name,role};members.push(o);return o;};
+    const E=(o)=>{const e={id:uid(),tasks:[],status:'planning',...o};events.push(e);return e;};
+    const S=(o)=>{speakers.push({id:uid(),stage:'idea',...o});};
+    const T=(o)=>{tasks.push({id:uid(),done:false,...o});};
+
+    const pres=M('Ariel','President'), vp=M('Vice President','VP'),
+          treas=M('Treasurer','Budget & finances'), sec=M('Secretary','Records & comms'),
+          memb=M('Membership Director','Members & recruiting'),
+          accom=M('Accommodations Officer','Venues & logistics'),
+          bizrel=M('Director of Business Relations','Speaker & sponsor outreach');
+
+    const oct21=E({title:'Steve Miller — Origin Ventures',type:'speaker',date:'2026-10-21',time:'18:00',
+      location:'ECEB 1002',status:'confirmed',
+      notes:'Topics: his career path, AI infrastructure, and building AI-native startups.',
+      tasks:[{t:'Confirm room booking',done:true,owner:accom.id},{t:'Send calendar invite to members',done:false,owner:sec.id},
+             {t:'Prep intro + Q&A questions',done:false,owner:pres.id},{t:'Order refreshments',done:false,owner:treas.id}]});
+    S({name:'Steve Miller',org:'Origin Ventures',contact:'',topics:'Career, AI infrastructure, AI-native startups',
+      notes:'Confirmed for Oct 21.',stage:'confirmed',eventId:oct21.id,owner:bizrel.id});
+    S({name:'Al Goldstein',org:'Prior keynote',contact:'',topics:'Entrepreneurship / fintech',
+      notes:'Past keynote — inspired the current outreach push. Possible return invite.',stage:'done',eventId:null,owner:null});
+    S({name:'(prospect)',org:'Aerospace / hardware founder',contact:'',topics:'Deep-tech, propulsion, hard-tech startups',
+      notes:'Idea stage — good fit for the engineering side of the club.',stage:'idea',eventId:null,owner:bizrel.id});
+    E({title:'Officer sync',type:'meeting',date:isoOffset(3),time:'19:00',location:'Grainger 2nd floor',status:'planning',
+      notes:'Plan fall semester speaker cadence.',
+      tasks:[{t:'Draft semester calendar',done:false,owner:pres.id},{t:'Divide outreach targets',done:false,owner:bizrel.id},
+             {t:'Confirm recurring meeting room',done:false,owner:accom.id}]});
+    E({title:'Exec board meeting',type:'exec',date:'2026-10-07',time:'18:30',location:'Grainger 3341',status:'confirmed',
+      notes:'Monthly exec board check-in. Budget review, event pipeline, membership numbers.',
+      tasks:[{t:'Circulate agenda',done:false,owner:sec.id},{t:'Budget snapshot',done:false,owner:treas.id},
+             {t:'Membership update',done:false,owner:memb.id}]});
+    T({t:'Renew club registration with SORF',owner:treas.id,cat:'finance',due:isoOffset(10)});
+    T({t:'Post recap of last event to Instagram',owner:memb.id,cat:'marketing',due:null});
+  }
+};
 
 /* helpers */
 function isoOffset(days){ const d=new Date(); d.setDate(d.getDate()+days); return d.toISOString().slice(0,10); }
@@ -1036,10 +1122,10 @@ function openMembers(){
         inp.onchange=()=>store.updateMember(mm.id,{[inp.dataset.f]:inp.value.trim()});
       });
       const delB=row.querySelector('.del'); let armed=false,t;
-      delB.onclick=()=>{
+      delB.onclick=async()=>{
         if(!armed){armed=true;delB.classList.add('armed');delB.innerHTML='Remove?';
           t=setTimeout(()=>{armed=false;delB.classList.remove('armed');delB.innerHTML=xIcon(15);},3000);return;}
-        clearTimeout(t);store.deleteMember(mm.id);draw();
+        clearTimeout(t);await store.deleteMember(mm.id);draw();
       };
       list.appendChild(row);
     });
@@ -1047,7 +1133,7 @@ function openMembers(){
   draw();
 
   const nameI=m.querySelector('#m-name'), roleI=m.querySelector('#m-role');
-  const add=()=>{const n=nameI.value.trim();if(!n)return;store.addMember({name:n,role:roleI.value.trim()});nameI.value='';roleI.value='';draw();nameI.focus();};
+  const add=async()=>{const n=nameI.value.trim();if(!n)return;await store.addMember({name:n,role:roleI.value.trim()});nameI.value='';roleI.value='';draw();nameI.focus();};
   m.querySelector('#m-add').onclick=add;
   nameI.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();add();}});
   roleI.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();add();}});
@@ -1117,10 +1203,55 @@ function checkIcon(){return `<svg viewBox="0 0 24 24" width="13" height="13" fil
 function xIcon(sz=18){return `<svg viewBox="0 0 24 24" width="${sz}" height="${sz}" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>`;}
 function esc(s){return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 
-/* boot */
-store.seed();
-calDate=new Date(2026,9,1); // land on October so the Steve Miller event is visible
-render();
+/* toast */
+function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show');
+  clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove('show'),3200); }
+
+/* auth gate */
+const gate=$('#authgate');
+function showLogin(){ gate.classList.add('open'); }
+function hideLogin(){ gate.classList.remove('open'); }
+function auMsg(s){ $('#au-msg').textContent=s||''; }
+
+function setFooter(connected){
+  const f=$('#sideFoot');
+  if(!connected){ f.innerHTML='<b>Demo mode.</b> Not connected to Supabase — changes reset on reload. Add your project URL and key in the file to enable shared saving.'; return; }
+  f.innerHTML='<div style="margin-bottom:8px">Shared live with your board.</div><button id="signout" style="color:#a6a9c4;font-weight:600;font-size:12px">Sign out</button>';
+  $('#signout').onclick=()=>sb.auth.signOut();
+}
+
+function wireAuthUI(){
+  const email=()=>$('#au-email').value.trim(), pass=()=>$('#au-pass').value;
+  $('#au-signin').onclick=async()=>{ auMsg('Signing in…');
+    const {error}=await sb.auth.signInWithPassword({email:email(),password:pass()});
+    auMsg(error?error.message:''); };
+  $('#au-signup').onclick=async()=>{ auMsg('Creating account…');
+    const {error}=await sb.auth.signUp({email:email(),password:pass()});
+    auMsg(error?error.message:'Account created. If email confirmation is on, confirm via the link, then sign in.'); };
+  $('#au-pass').addEventListener('keydown',e=>{ if(e.key==='Enter') $('#au-signin').click(); });
+}
+
+let _appStarted=false;
+async function startApp(){
+  hideLogin(); setFooter(true);
+  if(!_appStarted){ _appStarted=true; subscribeRealtime(); }
+  await loadAll();
+  calDate=new Date(2026,9,1);
+  render();
+}
+
+async function boot(){
+  if(!CONNECTED){                    // local demo mode (e.g. the in-app preview)
+    setFooter(false); store.seed(); calDate=new Date(2026,9,1); render(); return;
+  }
+  if(!window.supabase){ toast('Could not load Supabase library'); return; }
+  sb=window.supabase.createClient(CONFIG.url,CONFIG.key);
+  wireAuthUI();
+  sb.auth.onAuthStateChange((_e,session)=>{ if(session) startApp(); else { _appStarted=false; showLogin(); } });
+  const {data:{session}}=await sb.auth.getSession();
+  if(session) startApp(); else showLogin();
+}
+boot();
 </script>
 </body>
 </html>
