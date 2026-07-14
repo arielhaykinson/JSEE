@@ -223,6 +223,8 @@
   .mrow-check .ring{width:16px;height:16px;border-radius:50%;border:2px solid var(--line-strong);transition:.12s;position:relative}
   .mrow-check:hover .ring{border-color:var(--s-confirmed);background:var(--s-confirmed-bg)}
   .mrow-check:hover .ring::after{content:'';position:absolute;left:4px;top:1px;width:4px;height:8px;border:solid var(--s-confirmed);border-width:0 2px 2px 0;transform:rotate(45deg)}
+  .mrow-check.checked .ring{border-color:var(--s-confirmed);background:var(--s-confirmed)}
+  .mrow-check.checked .ring::after{content:'';position:absolute;left:4px;top:1px;width:4px;height:8px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg)}
   .mrow.task.is-done .mrow-t{text-decoration:line-through;color:var(--ink-faint)}
   .mnothing{font-size:12.5px;color:var(--ink-faint);padding:8px 14px 12px;font-style:italic}
 
@@ -230,7 +232,9 @@
   .card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
 
   /* task owner select in event modal */
-  .task .task-owner{margin-left:auto;font-size:11.5px;padding:4px 6px;border:1px solid var(--line-strong);border-radius:7px;background:var(--surface);color:var(--ink-soft);max-width:120px}
+  .task .task-owner{font-size:11.5px;padding:4px 6px;border:1px solid var(--line-strong);border-radius:7px;background:var(--surface);color:var(--ink-soft);max-width:120px}
+  .task>span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .task .task-cat{font-size:11.5px;padding:4px 6px;border:1px solid var(--line-strong);border-radius:7px;background:var(--surface);color:var(--ink-soft);max-width:110px}
   .task .del{margin-left:0}
 
   /* member editor rows */
@@ -386,6 +390,7 @@ const CONNECTED = !CONFIG.url.includes('YOUR-') && !CONFIG.key.includes('YOUR-')
 let sb = null;                 // supabase client (set in boot)
 let currentEmail = null;       // signed-in user's email (for "Mine" filter)
 let homeScope = 'all';         // 'all' | 'mine'
+let showDone = false;          // Home: reveal completed items
 let events=[], speakers=[], members=[], tasks=[];
 let _id=1; const uid=()=>'x'+(_id++);
 const emit=()=>document.dispatchEvent(new Event('store:change'));
@@ -741,8 +746,14 @@ function dueFlag(iso){
 // unified list of OPEN to-dos (event action items + standalone tasks)
 function openTodos(){
   const out=[];
-  store.events().forEach(ev=>(ev.tasks||[]).forEach((t,i)=>{ if(!t.done) out.push({t:t.t,date:ev.date,owner:t.owner,kind:'event',event:ev,idx:i}); }));
-  store.tasks().forEach(t=>{ if(!t.done) out.push({t:t.t,date:t.due||null,owner:t.owner,kind:'solo',cat:t.cat,task:t}); });
+  store.events().forEach(ev=>(ev.tasks||[]).forEach((t,i)=>{ if(!t.done) out.push({t:t.t,date:ev.date,owner:t.owner,kind:'event',event:ev,idx:i,cat:t.cat,done:false}); }));
+  store.tasks().forEach(t=>{ if(!t.done) out.push({t:t.t,date:t.due||null,owner:t.owner,kind:'solo',cat:t.cat,task:t,done:false}); });
+  return out;
+}
+function doneTodos(){
+  const out=[];
+  store.events().forEach(ev=>(ev.tasks||[]).forEach((t,i)=>{ if(t.done) out.push({t:t.t,date:ev.date,owner:t.owner,kind:'event',event:ev,idx:i,cat:t.cat,done:true}); }));
+  store.tasks().forEach(t=>{ if(t.done) out.push({t:t.t,date:t.due||null,owner:t.owner,kind:'solo',cat:t.cat,task:t,done:true}); });
   return out;
 }
 
@@ -760,6 +771,9 @@ function renderHome(){
   </div>`);
   toggle.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;homeScope=b.dataset.scope;render();});
   topActions.appendChild(toggle);
+  const doneBtn=el(`<button class="btn btn-ghost">${showDone?'Hide completed':'Show completed'}</button>`);
+  doneBtn.onclick=()=>{ showDone=!showDone; render(); };
+  topActions.appendChild(doneBtn);
   topActions.appendChild(el(`<button class="btn btn-ghost">${plusIcon()} Manage board</button>`))
     .onclick=()=>openMembers();
 
@@ -768,6 +782,7 @@ function renderHome(){
 
   // ---- summary strip ----
   const allOpen=openTodos();
+  const allDone=showDone?doneTodos():[];
   const overdue=allOpen.filter(t=>dueFlag(t.date)?.cls==='overdue').length;
   const soon=allOpen.filter(t=>dueFlag(t.date)?.cls==='soon').length;
   const upcoming=store.events().filter(e=>e.date>=todayISO()).length;
@@ -784,19 +799,20 @@ function renderHome(){
 
   // ---- shared card builders (used by both "Mine" and "Everyone") ----
   const todoRow=(o)=>{
-    const f=dueFlag(o.date);
+    const f = o.done ? null : dueFlag(o.date);
     const rightLabel = o.kind==='event' ? `${esc(o.event.title)} · ${fmtDate(o.date)}` : (o.date?fmtDate(o.date):'personal task');
-    const row=el(`<div class="mrow task">
-      <button class="mrow-check" title="Mark done"><span class="ring"></span></button>
+    const row=el(`<div class="mrow task ${o.done?'is-done':''}">
+      <button class="mrow-check ${o.done?'checked':''}" title="${o.done?'Reopen':'Mark done'}"><span class="ring"></span></button>
       <span class="mrow-t">${esc(o.t)}</span>
-      ${o.kind==='solo'&&o.cat?catChip(o.cat):''}
+      ${o.cat?catChip(o.cat):''}
       ${f?`<span class="due ${f.cls}">${f.label}</span>`:''}
       <span class="mrow-x">${rightLabel}</span>
     </div>`);
     row.querySelector('.mrow-check').onclick=(e)=>{
       e.stopPropagation();
-      if(o.kind==='event') store.setEventTaskDone(o.event.id,o.idx,true);
-      else store.updateTask(o.task.id,{done:true});
+      const nv=!o.done;
+      if(o.kind==='event') store.setEventTaskDone(o.event.id,o.idx,nv);
+      else store.updateTask(o.task.id,{done:nv});
     };
     row.onclick=()=> o.kind==='event' ? openEvent(o.event.id) : openTask(o.task.id);
     return row;
@@ -817,6 +833,14 @@ function renderHome(){
       const sec=el(`<div class="msec"><div class="msec-h">To do</div></div>`);
       todos.sort((a,b)=>(a.date||'9999').localeCompare(b.date||'9999')).forEach(o=>sec.appendChild(todoRow(o)));
       body.appendChild(sec);
+    }
+    if(showDone){
+      const done=allDone.filter(o=>o.owner===memberId);
+      if(done.length){
+        const sec=el(`<div class="msec"><div class="msec-h">Completed (${done.length})</div></div>`);
+        done.sort((a,b)=>(b.date||'').localeCompare(a.date||'')).forEach(o=>sec.appendChild(todoRow(o)));
+        body.appendChild(sec);
+      }
     }
     return todos.length+activeOwned.length;
   };
@@ -972,16 +996,19 @@ function openEvent(id,presetDate){
   // tasks
   const taskList=m.querySelector('#tasklist');
   const memberOpts=(sel)=>`<option value="">Unassigned</option>`+store.members().map(mm=>`<option value="${mm.id}" ${sel===mm.id?'selected':''}>${esc(mm.name)}</option>`).join('');
+  const catOpts=(sel)=>CATEGORIES.map(c=>`<option value="${c.key}" ${(sel||'general')===c.key?'selected':''}>${c.label}</option>`).join('');
   function drawTasks(){
     taskList.innerHTML='';
     e.tasks.forEach((t,i)=>{
       const row=el(`<div class="task ${t.done?'done':''}">
         <input type="checkbox" ${t.done?'checked':''}>
         <span>${esc(t.t)}</span>
+        <select class="task-cat" title="Category">${catOpts(t.cat)}</select>
         <select class="task-owner" title="Assign to">${memberOpts(t.owner)}</select>
         <button class="del">${xIcon(14)}</button>
       </div>`);
       row.querySelector('input[type=checkbox]').onchange=ev=>{e.tasks[i].done=ev.target.checked;drawTasks();};
+      row.querySelector('.task-cat').onchange=ev=>{e.tasks[i].cat=ev.target.value;};
       row.querySelector('.task-owner').onchange=ev=>{e.tasks[i].owner=ev.target.value||null;};
       row.querySelector('.del').onclick=()=>{e.tasks.splice(i,1);drawTasks();};
       taskList.appendChild(row);
@@ -989,7 +1016,7 @@ function openEvent(id,presetDate){
   }
   drawTasks();
   const taskInput=m.querySelector('#f-task');
-  const addTask=()=>{const v=taskInput.value.trim();if(!v)return;e.tasks.push({t:v,done:false,owner:null});taskInput.value='';drawTasks();taskInput.focus();};
+  const addTask=()=>{const v=taskInput.value.trim();if(!v)return;e.tasks.push({t:v,done:false,owner:null,cat:'general'});taskInput.value='';drawTasks();taskInput.focus();};
   m.querySelector('#addtask').onclick=addTask;
   taskInput.addEventListener('keydown',ev=>{if(ev.key==='Enter'){ev.preventDefault();addTask();}});
 
