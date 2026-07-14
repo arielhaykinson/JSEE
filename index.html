@@ -266,28 +266,25 @@
   .poll-del:hover{background:var(--s-declined-bg);color:var(--s-declined)}
   .poll-del.armed{width:auto;padding:0 10px;font-size:11px;font-weight:700;background:var(--s-declined-bg);color:var(--s-declined)}
   .poll-sub{font-size:12px;color:var(--ink-soft);margin:2px 0 14px}
-  .poll-opts{display:flex;flex-direction:column;gap:8px}
-  .poll-opt{display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--radius-sm);background:var(--surface-2)}
-  .poll-opt.best{border-color:var(--s-confirmed);background:var(--s-confirmed-bg)}
-  .poll-check{width:24px;height:24px;flex:none;display:grid;place-items:center;border:none;background:none;cursor:pointer}
-  .poll-check .ring{width:20px;height:20px;border-radius:6px;border:2px solid var(--line-strong);position:relative;transition:.12s}
-  .poll-check:hover .ring{border-color:var(--s-confirmed)}
-  .poll-check.on .ring{border-color:var(--s-confirmed);background:var(--s-confirmed)}
-  .poll-check.on .ring::after{content:'';position:absolute;left:5px;top:1px;width:5px;height:10px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg)}
-  .poll-opt-main{flex:1;min-width:0}
-  .poll-opt-top{display:flex;align-items:center;gap:10px}
-  .poll-slot{font-size:13.5px;font-weight:600}
-  .poll-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:var(--s-confirmed);color:#fff;text-transform:uppercase;letter-spacing:.03em}
-  .poll-count{margin-left:auto;font-size:12px;color:var(--ink-soft);font-weight:600;flex:none}
-  .poll-bar{height:5px;background:var(--line);border-radius:3px;margin:7px 0 5px;overflow:hidden}
-  .poll-bar span{display:block;height:100%;background:var(--s-confirmed);border-radius:3px;transition:width .2s}
-  .poll-who{font-size:11.5px;color:var(--ink-soft)}
-  .poll-who.none{color:var(--ink-faint);font-style:italic}
-  .poll-sched{flex:none;padding:7px 12px;font-size:12px}
+  .poll-scroll{overflow-x:visible}
+  .tgrid{border-collapse:separate;border-spacing:3px;width:100%;table-layout:fixed}
+  .tgrid th.tcorner{width:56px}
+  .tgrid th.tdate{padding:2px 2px 8px;text-align:center}
+  .tgrid th.tdate .tdow{display:block;font-size:11px;font-weight:700;color:var(--ink);text-transform:uppercase;letter-spacing:.02em}
+  .tgrid th.tdate .tdm{display:block;font-size:10.5px;color:var(--ink-faint);font-weight:500}
+  .tgrid td.tlabel{font-size:10.5px;color:var(--ink-soft);font-weight:600;text-align:right;padding-right:6px;white-space:nowrap;width:56px}
+  .tcell{width:100%;min-width:0;height:30px;border:1px solid var(--line);border-radius:6px;background:var(--surface-2);cursor:pointer;font-size:11px;font-weight:700;color:var(--ink);transition:transform .06s}
+  .tcell:hover{transform:scale(1.06);border-color:var(--ink-faint)}
+  .tcell.mine{outline:2px solid var(--primary);outline-offset:-2px}
+  .tcell.best{box-shadow:0 0 0 2px var(--s-confirmed)}
+  .poll-best{margin-top:14px;border-top:1px solid var(--line);padding-top:12px}
+  .poll-best-h{font-size:11px;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px}
+  .poll-best-row{display:flex;align-items:center;gap:12px;padding:7px 0}
+  .poll-best-slot{font-size:13px;font-weight:600;flex:none;min-width:150px}
+  .poll-who{font-size:11.5px;color:var(--ink-soft);flex:1;min-width:0}
+  .poll-sched{flex:none;padding:6px 12px;font-size:12px}
   .popt-edit{display:flex;align-items:center;gap:8px;padding:6px 0}
-  .popt-edit input[type=date]{flex:none}
-  .popt-edit input[type=text]{flex:1;padding:8px 10px;border:1px solid var(--line-strong);border-radius:8px}
-  .popt-edit input[type=date],.popt-edit input[type=time]{padding:8px;border:1px solid var(--line-strong);border-radius:8px;color:var(--ink-soft);font-size:12.5px}
+  .popt-edit input[type=date],.popt-edit input[type=time]{flex:1;padding:8px;border:1px solid var(--line-strong);border-radius:8px;color:var(--ink-soft);font-size:12.5px}
   .popt-edit .del{width:30px;height:30px;border-radius:7px;display:grid;place-items:center;color:var(--ink-faint);flex:none}
   .popt-edit .del:hover{background:var(--s-declined-bg);color:var(--s-declined)}
 
@@ -468,8 +465,11 @@ const taskToRow   = t => ({body:t.t,done:!!t.done,owner:t.owner||null,cat:t.cat|
 const rowToTask   = r => ({id:r.id,t:r.body,done:r.done,owner:r.owner,cat:r.cat,due:r.due});
 const noteToRow   = n => ({title:n.title,note_date:n.date||null,body:n.body||null,event_id:n.eventId||null});
 const rowToNote   = r => ({id:r.id,title:r.title,date:r.note_date,body:r.body,eventId:r.event_id,created_at:r.created_at});
-const pollToRow   = p => ({title:p.title,options:p.options||[],votes:p.votes||{}});
-const rowToPoll   = r => ({id:r.id,title:r.title,options:r.options||[],votes:r.votes||{},created_at:r.created_at});
+const pollToRow   = p => ({title:p.title,options:{dates:p.dates||[],times:p.times||[]},votes:p.votes||{}});
+const rowToPoll   = r => { const o=r.options; const arr=Array.isArray(o);
+  return {id:r.id,title:r.title,
+    dates: arr?[]:((o&&o.dates)||[]), times: arr?[]:((o&&o.times)||[]),
+    legacyOptions: arr?o:null, votes:r.votes||{}, created_at:r.created_at}; };
 
 async function loadAll(){
   const [ev,sp,me,ta] = await Promise.all([
@@ -582,7 +582,7 @@ const store = {
     if(CONNECTED){ const {error}=await sb.from('meeting_notes').delete().eq('id',id); if(error) fail(error); } },
 
   // availability poll writes
-  async addPoll(d){ const rec={options:[],votes:{},...d};
+  async addPoll(d){ const rec={dates:[],times:[],votes:{},...d};
     if(CONNECTED){ const {data,error}=await sb.from('meeting_polls').insert(pollToRow(rec)).select().single();
       if(error) return fail(error); polls.push(rowToPoll(data)); }
     else { polls.push({id:uid(),...rec}); } emit(); },
@@ -590,10 +590,10 @@ const store = {
     if(CONNECTED){ const {error}=await sb.from('meeting_polls').update(pollToRow(p)).eq('id',id); if(error) fail(error); } },
   async deletePoll(id){ polls=polls.filter(p=>p.id!==id); emit();
     if(CONNECTED){ const {error}=await sb.from('meeting_polls').delete().eq('id',id); if(error) fail(error); } },
-  async setVote(pollId,who,optionIndex,on){ const p=store.poll(pollId); if(!p) return;
+  async setVote(pollId,who,key,on){ const p=store.poll(pollId); if(!p) return;
     const votes={...(p.votes||{})}; const cur=new Set(votes[who]||[]);
-    if(on) cur.add(optionIndex); else cur.delete(optionIndex);
-    votes[who]=[...cur].sort((a,b)=>a-b); p.votes=votes; emit();
+    if(on) cur.add(key); else cur.delete(key);
+    votes[who]=[...cur]; p.votes=votes; emit();
     if(CONNECTED){ const {error}=await sb.from('meeting_polls').update({votes}).eq('id',pollId); if(error) fail(error); } }
 };
 
@@ -861,20 +861,17 @@ function renderNotes(){
   content.appendChild(grid);
 }
 
-/* ---------- Find a time (availability polls) ---------- */
+/* ---------- Find a time (availability grid) ---------- */
 function currentIdentity(){
   const me = currentEmail ? store.members().find(m=>m.email && m.email.toLowerCase()===currentEmail.toLowerCase()) : null;
   return me?.name || currentEmail || 'You';
 }
-function slotLabel(o){
-  if(!o) return '';
-  const d = o.date ? fmtDate(o.date) : (o.note||'Option');
-  const t = o.time ? ' · '+fmtTime(o.time) : '';
-  return d + t + (o.date && o.note ? ' · '+o.note : (!o.date && o.time ? '' : ''));
-}
+function dowShort(iso){ const [y,m,d]=iso.split('-').map(Number); return new Date(y,m-1,d).toLocaleDateString('en-US',{weekday:'short'}); }
+function dmShort(iso){ const [y,m,d]=iso.split('-').map(Number); return new Date(y,m-1,d).toLocaleDateString('en-US',{month:'short',day:'numeric'}); }
+
 function renderSchedule(){
   title.textContent='Find a time';
-  subtitle.textContent='Propose times, let everyone check what works, then schedule the winner.';
+  subtitle.textContent='Paint the slots you can make. The darker the cell, the more people are free.';
   topActions.innerHTML='';
   topActions.appendChild(el(`<button class="btn btn-primary">${plusIcon()} New poll</button>`))
     .onclick=()=>openPoll(null);
@@ -883,58 +880,95 @@ function renderSchedule(){
   const list=store.polls().slice().sort((a,b)=>(b.created_at||'').localeCompare(a.created_at||''));
   content.innerHTML='';
   if(!list.length){
-    content.appendChild(el(`<div class="empty">${clockIcon()}<div>No polls yet. Click <b>New poll</b> to propose a few times and see when everyone's free.</div></div>`));
+    content.appendChild(el(`<div class="empty">${clockIcon()}<div>No polls yet. Click <b>New poll</b> to set some dates and a time window, then everyone marks when they're free.</div></div>`));
     return;
   }
 
   list.forEach(p=>{
     const votes=p.votes||{};
     const respondents=Object.keys(votes).filter(k=>(votes[k]||[]).length);
-    const counts=(p.options||[]).map((_,i)=>respondents.filter(r=>votes[r].includes(i)).length);
-    const best=Math.max(0,...counts);
+    const R=respondents.length;
 
     const card=el(`<div class="pollcard">
       <div class="poll-h">
         <h4>${esc(p.title||'Untitled poll')}</h4>
-        <button class="poll-del" title="Delete poll">${xIcon(16)}</button>
+        <div style="display:flex;gap:6px;align-items:center">
+          <button class="btn btn-ghost poll-edit" style="padding:6px 11px;font-size:12px">Edit</button>
+          <button class="poll-del" title="Delete poll">${xIcon(16)}</button>
+        </div>
       </div>
-      <div class="poll-sub">${respondents.length} responded · you're voting as <b>${esc(me)}</b></div>
-      <div class="poll-opts"></div>
+      <div class="poll-sub">${R} responded · you're marking availability as <b>${esc(me)}</b></div>
+      <div class="poll-scroll"></div>
+      <div class="poll-best"></div>
     </div>`);
 
-    // delete (two-click)
+    card.querySelector('.poll-edit').onclick=()=>openPoll(p.id);
     const del=card.querySelector('.poll-del'); let armed=false,tm;
     del.onclick=()=>{ if(!armed){armed=true;del.classList.add('armed');del.innerHTML='Delete?';
       tm=setTimeout(()=>{armed=false;del.classList.remove('armed');del.innerHTML=xIcon(16);},3000);return;}
       clearTimeout(tm);store.deletePoll(p.id); };
 
-    const opts=card.querySelector('.poll-opts');
-    (p.options||[]).forEach((o,i)=>{
-      const who=respondents.filter(r=>votes[r].includes(i));
-      const mine=(votes[me]||[]).includes(i);
-      const isBest=best>0 && counts[i]===best;
-      const pct=respondents.length?Math.round(counts[i]/respondents.length*100):0;
-      const row=el(`<div class="poll-opt ${isBest?'best':''}">
-        <button class="poll-check ${mine?'on':''}" title="I can make this"><span class="ring"></span></button>
-        <div class="poll-opt-main">
-          <div class="poll-opt-top">
-            <span class="poll-slot">${esc(slotLabel(o))}</span>
-            ${isBest?'<span class="poll-badge">Best</span>':''}
-            <span class="poll-count">${counts[i]} available</span>
-          </div>
-          <div class="poll-bar"><span style="width:${pct}%"></span></div>
-          ${who.length?`<div class="poll-who">${who.map(w=>esc(w)).join(', ')}</div>`:'<div class="poll-who none">no one yet</div>'}
-        </div>
-        ${o.date?`<button class="btn btn-ghost poll-sched">Schedule</button>`:''}
-      </div>`);
-      row.querySelector('.poll-check').onclick=()=>store.setVote(p.id,me,i,!mine);
-      const sched=row.querySelector('.poll-sched');
-      if(sched) sched.onclick=(e)=>{ e.stopPropagation();
-        store.addEvent({title:p.title||'Meeting',type:'meeting',date:o.date,time:o.time||'',location:'',status:'planning',
-          notes:'Scheduled from availability poll',tasks:[]});
-        toast('Added to the calendar'); };
-      opts.appendChild(row);
+    const dates=p.dates||[], times=p.times||[];
+    const wrap=card.querySelector('.poll-scroll');
+
+    if(!dates.length || !times.length){
+      wrap.appendChild(el(`<div class="mnothing" style="padding:12px 2px">No time slots yet — click <b>Edit</b> to add dates and a time window.</div>`));
+      content.appendChild(card);
+      return;
+    }
+
+    const cellCount = id => respondents.reduce((n,r)=>n+(votes[r].includes(id)?1:0),0);
+    let bestCount=0;
+    dates.forEach(d=>times.forEach(t=>{ const c=cellCount(d+'|'+t); if(c>bestCount) bestCount=c; }));
+
+    // grid
+    const table=el(`<table class="tgrid"><thead></thead><tbody></tbody></table>`);
+    const thead=table.querySelector('thead'), tbody=table.querySelector('tbody');
+    const hr=el(`<tr><th class="tcorner"></th></tr>`);
+    dates.forEach(d=>hr.appendChild(el(`<th class="tdate"><span class="tdow">${dowShort(d)}</span><span class="tdm">${dmShort(d)}</span></th>`)));
+    thead.appendChild(hr);
+    times.forEach(t=>{
+      const tr=el(`<tr><td class="tlabel">${fmtTime(t)}</td></tr>`);
+      dates.forEach(d=>{
+        const id=d+'|'+t;
+        const c=cellCount(id);
+        const mine=(votes[me]||[]).includes(id);
+        const alpha=R?(c/R):0;
+        const isBest=bestCount>0 && c===bestCount;
+        const td=el(`<td><button class="tcell ${mine?'mine':''} ${isBest?'best':''}" data-cell="${id}" title="${c} of ${R} free" style="background:rgba(31,157,107,${alpha.toFixed(2)})">${c||''}</button></td>`);
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
     });
+    wrap.appendChild(table);
+
+    wrap.querySelectorAll('.tcell').forEach(btn=>{
+      btn.onclick=()=>{ const id=btn.dataset.cell; const mine=(votes[me]||[]).includes(id); store.setVote(p.id,me,id,!mine); };
+    });
+
+    // best times summary + schedule
+    const bestBox=card.querySelector('.poll-best');
+    if(bestCount>0){
+      const bests=[];
+      dates.forEach(d=>times.forEach(t=>{ if(cellCount(d+'|'+t)===bestCount) bests.push({d,t}); }));
+      const head=el(`<div class="poll-best-h">Best so far — ${bestCount} of ${R} free</div>`);
+      bestBox.appendChild(head);
+      bests.slice(0,6).forEach(b=>{
+        const who=respondents.filter(r=>votes[r].includes(b.d+'|'+b.t));
+        const row=el(`<div class="poll-best-row">
+          <span class="poll-best-slot">${dowShort(b.d)} ${dmShort(b.d)} · ${fmtTime(b.t)}</span>
+          <span class="poll-who">${who.map(w=>esc(w)).join(', ')||'—'}</span>
+          <button class="btn btn-ghost poll-sched">Schedule</button>
+        </div>`);
+        row.querySelector('.poll-sched').onclick=()=>{
+          store.addEvent({title:p.title||'Meeting',type:'meeting',date:b.d,time:b.t,location:'',status:'planning',
+            notes:'Scheduled from availability poll',tasks:[]});
+          toast('Added to the calendar');
+        };
+        bestBox.appendChild(row);
+      });
+    }
+
     content.appendChild(card);
   });
 }
@@ -1509,18 +1543,46 @@ function openNote(id){
   setTimeout(()=>m.querySelector('#n-title').focus(),40);
 }
 
-/* ----- availability poll modal ----- */
+/* ----- availability poll modal (grid) ----- */
+function timeToMin(t){ const [h,m]=t.split(':').map(Number); return h*60+m; }
+function minToTime(x){ return `${String(Math.floor(x/60)).padStart(2,'0')}:${String(x%60).padStart(2,'0')}`; }
+function genTimes(start,end,step){ const s=timeToMin(start), e=timeToMin(end); const out=[];
+  if(e<=s||!step) return out;
+  for(let x=s;x<=e && out.length<40;x+=step) out.push(minToTime(x)); return out; }
+
 function openPoll(id){
   const isNew=!id;
-  const p=id?{...store.poll(id),options:[...(store.poll(id).options||[])]}:{title:'',options:[{date:'',time:'',note:''}],votes:{}};
+  const src=id?store.poll(id):null;
+  const dates=id?[...(src.dates||[])]:[isoOffset(7)];
+  // derive time window from existing times, else defaults
+  let startT='17:00', endT='20:00', step=30;
+  if(src && (src.times||[]).length){
+    startT=src.times[0]; endT=src.times[src.times.length-1];
+    if(src.times.length>1) step=timeToMin(src.times[1])-timeToMin(src.times[0]);
+  }
+  if(!dates.length) dates.push(isoOffset(7));
 
   const m=el(`<div class="modal">
     <div class="modal-head"><h3>${isNew?'New availability poll':'Edit poll'}</h3><button class="x">${xIcon()}</button></div>
     <div class="modal-body">
-      <div class="field"><label>What are we scheduling?</label><input id="p-title" placeholder="e.g. November exec board meeting" value="${esc(p.title)}"></div>
-      <div class="field"><label>Proposed times</label>
-        <div id="p-opts"></div>
-        <button class="col-add" id="p-addopt" style="margin-top:8px">+ Add a time option</button>
+      <div class="field"><label>What are we scheduling?</label><input id="p-title" placeholder="e.g. November exec board meeting" value="${esc(id?src.title:'')}"></div>
+      <div class="field"><label>Candidate dates</label>
+        <div id="p-dates"></div>
+        <button class="col-add" id="p-adddate" style="margin-top:8px">+ Add a date</button>
+      </div>
+      <div class="field"><label>Time window</label>
+        <div class="row2">
+          <div class="field"><label style="font-weight:500;color:var(--ink-faint)">From</label><input type="time" id="p-start" value="${startT}"></div>
+          <div class="field"><label style="font-weight:500;color:var(--ink-faint)">To</label><input type="time" id="p-end" value="${endT}"></div>
+        </div>
+        <div class="field" style="margin-top:8px"><label style="font-weight:500;color:var(--ink-faint)">Slot length</label>
+          <select id="p-step">
+            <option value="15" ${step===15?'selected':''}>15 minutes</option>
+            <option value="30" ${step===30?'selected':''}>30 minutes</option>
+            <option value="60" ${step===60?'selected':''}>1 hour</option>
+          </select>
+        </div>
+        <div class="mnothing" id="p-preview" style="padding:8px 2px 0"></div>
       </div>
     </div>
     <div class="modal-foot">
@@ -1532,23 +1594,24 @@ function openPoll(id){
     </div>
   </div>`);
 
-  const optWrap=m.querySelector('#p-opts');
-  function drawOpts(){
-    optWrap.innerHTML='';
-    p.options.forEach((o,i)=>{
-      const row=el(`<div class="popt-edit">
-        <input type="date" data-f="date" value="${o.date||''}">
-        <input type="time" data-f="time" value="${o.time||''}">
-        <input type="text" data-f="note" placeholder="note (optional)" value="${esc(o.note||'')}">
-        <button class="del" title="Remove">${xIcon(14)}</button>
-      </div>`);
-      row.querySelectorAll('input').forEach(inp=>{ inp.onchange=()=>{ p.options[i][inp.dataset.f]=inp.value; }; });
-      row.querySelector('.del').onclick=()=>{ p.options.splice(i,1); if(!p.options.length)p.options.push({date:'',time:'',note:''}); drawOpts(); };
-      optWrap.appendChild(row);
+  const dateWrap=m.querySelector('#p-dates');
+  function drawDates(){
+    dateWrap.innerHTML='';
+    dates.forEach((d,i)=>{
+      const row=el(`<div class="popt-edit"><input type="date" value="${d||''}"><button class="del" title="Remove">${xIcon(14)}</button></div>`);
+      row.querySelector('input').onchange=ev=>{ dates[i]=ev.target.value; };
+      row.querySelector('.del').onclick=()=>{ dates.splice(i,1); if(!dates.length)dates.push(''); drawDates(); };
+      dateWrap.appendChild(row);
     });
   }
-  drawOpts();
-  m.querySelector('#p-addopt').onclick=()=>{ p.options.push({date:'',time:'',note:''}); drawOpts(); };
+  drawDates();
+  m.querySelector('#p-adddate').onclick=()=>{ const last=[...dates].filter(Boolean).pop(); dates.push(last?addWeeksISO(last,1):''); drawDates(); };
+
+  const preview=m.querySelector('#p-preview');
+  const updatePreview=()=>{ const ts=genTimes(m.querySelector('#p-start').value,m.querySelector('#p-end').value,parseInt(m.querySelector('#p-step').value,10));
+    preview.textContent = ts.length ? `${ts.length} time slots per day (${fmtTime(ts[0])}–${fmtTime(ts[ts.length-1])})` : 'Set a valid time window (To must be after From).'; };
+  ['#p-start','#p-end','#p-step'].forEach(sel=>m.querySelector(sel).addEventListener('change',updatePreview));
+  updatePreview();
 
   m.querySelector('.x').onclick=closeModal;
   m.querySelector('#p-cancel').onclick=closeModal;
@@ -1557,8 +1620,11 @@ function openPoll(id){
       tm=setTimeout(()=>{armed=false;db.textContent='Delete poll';db.classList.remove('armed');},3000);return;}
       clearTimeout(tm);store.deletePoll(id);closeModal(); }; }
   m.querySelector('#p-save').onclick=async()=>{
-    const opts=p.options.filter(o=>o.date||o.note);   // drop empty rows
-    const data={ title:m.querySelector('#p-title').value.trim()||'Untitled poll', options:opts };
+    const cleanDates=[...new Set(dates.filter(Boolean))].sort();
+    const times=genTimes(m.querySelector('#p-start').value,m.querySelector('#p-end').value,parseInt(m.querySelector('#p-step').value,10));
+    if(!cleanDates.length){ toast('Add at least one date'); return; }
+    if(!times.length){ toast('Set a valid time window'); return; }
+    const data={ title:m.querySelector('#p-title').value.trim()||'Untitled poll', dates:cleanDates, times };
     if(isNew){ data.votes={}; await store.addPoll(data); } else { await store.updatePoll(id,data); }
     closeModal();
   };
