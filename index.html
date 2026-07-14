@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -246,6 +247,18 @@
   .mledit .del:hover{background:var(--s-declined-bg);color:var(--s-declined)}
   .mledit .del.armed{width:auto;padding:0 10px;font-size:11px;font-weight:700;background:var(--s-declined-bg);color:var(--s-declined)}
 
+  /* ---- meeting notes ---- */
+  .notegrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;align-items:start}
+  .notecard{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow);cursor:pointer;transition:.12s}
+  .notecard:hover{border-color:var(--line-strong);box-shadow:var(--shadow-lg)}
+  .note-h{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+  .note-h h4{font-family:var(--display);font-size:15px;font-weight:600;line-height:1.2}
+  .note-date{flex:none;font-size:11.5px;color:var(--ink-faint);font-weight:600}
+  .note-link{font-size:11.5px;font-weight:600;color:var(--primary-ink);background:var(--primary-soft);display:inline-block;padding:2px 9px;border-radius:20px;margin-top:8px}
+  .note-body{font-size:12.5px;color:var(--ink-soft);margin-top:10px;line-height:1.5;white-space:pre-wrap}
+  .note-empty{color:var(--ink-faint);font-style:italic}
+  .note-textarea{min-height:220px;resize:vertical;line-height:1.55;font-size:13.5px}
+
   /* ---- login gate ---- */
   .authgate{position:fixed;inset:0;z-index:100;background:var(--bg);display:none;align-items:center;justify-content:center;padding:24px}
   .authgate.open{display:flex}
@@ -309,6 +322,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="6" height="18" rx="1"/><rect x="10" y="3" width="6" height="12" rx="1"/><rect x="17" y="3" width="4" height="8" rx="1"/></svg>
         Speaker pipeline
       </button>
+      <button data-view="notes">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>
+        Meeting notes
+      </button>
     </nav>
     <div class="side-foot" id="sideFoot">
       <b>Frontend preview.</b> Data lives in this browser session for now — resets on reload. The store layer is built to swap for a shared backend next.
@@ -344,6 +361,10 @@
     <button data-view="pipeline">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="6" height="18" rx="1"/><rect x="10" y="3" width="6" height="12" rx="1"/><rect x="17" y="3" width="4" height="8" rx="1"/></svg>
       <span>Speakers</span>
+    </button>
+    <button data-view="notes">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>
+      <span>Notes</span>
     </button>
   </nav>
 </div>
@@ -391,7 +412,7 @@ let sb = null;                 // supabase client (set in boot)
 let currentEmail = null;       // signed-in user's email (for "Mine" filter)
 let homeScope = 'all';         // 'all' | 'mine'
 let showDone = false;          // Home: reveal completed items
-let events=[], speakers=[], members=[], tasks=[];
+let events=[], speakers=[], members=[], tasks=[], notes=[];
 let _id=1; const uid=()=>'x'+(_id++);
 const emit=()=>document.dispatchEvent(new Event('store:change'));
 function fail(err){ console.error(err); toast('Could not save — check your connection'); }
@@ -405,6 +426,8 @@ const memberToRow = m => ({name:m.name,role:m.role,email:m.email||null});
 const rowToMember = r => ({id:r.id,name:r.name,role:r.role,email:r.email||null});
 const taskToRow   = t => ({body:t.t,done:!!t.done,owner:t.owner||null,cat:t.cat||'general',due:t.due||null});
 const rowToTask   = r => ({id:r.id,t:r.body,done:r.done,owner:r.owner,cat:r.cat,due:r.due});
+const noteToRow   = n => ({title:n.title,note_date:n.date||null,body:n.body||null,event_id:n.eventId||null});
+const rowToNote   = r => ({id:r.id,title:r.title,date:r.note_date,body:r.body,eventId:r.event_id,created_at:r.created_at});
 
 async function loadAll(){
   const [ev,sp,me,ta] = await Promise.all([
@@ -418,11 +441,15 @@ async function loadAll(){
   speakers = (sp.data||[]).map(rowToSpeaker);
   members  = (me.data||[]).map(rowToMember);
   tasks    = (ta.data||[]).map(rowToTask);
+  // notes fetched separately so a missing table (before migration) doesn't break the app
+  try{ const nt=await sb.from('meeting_notes').select('*');
+    notes = nt.error ? [] : (nt.data||[]).map(rowToNote);
+  }catch(e){ notes=[]; }
 }
 let _rtSubscribed=false;
 function subscribeRealtime(){
   if(_rtSubscribed) return; _rtSubscribed=true;
-  ['events','speakers','members','tasks'].forEach(t=>{
+  ['events','speakers','members','tasks','meeting_notes'].forEach(t=>{
     sb.channel('rt-'+t)
       .on('postgres_changes',{event:'*',schema:'public',table:t},async()=>{ await loadAll(); emit(); })
       .subscribe();
@@ -435,10 +462,12 @@ const store = {
   speakers: () => [...speakers],
   members: () => [...members],
   tasks: () => [...tasks],
+  notes: () => [...notes],
   event: id => events.find(e => e.id === id),
   speaker: id => speakers.find(s => s.id === id),
   member: id => members.find(mm => mm.id === id),
   task: id => tasks.find(t => t.id === id),
+  note: id => notes.find(n => n.id === id),
   eventsOn: iso => events.filter(e => e.date === iso),
 
   // event writes
@@ -493,7 +522,17 @@ const store = {
   async updateTask(id,d){ const t=store.task(id); if(!t) return; Object.assign(t,d); emit();
     if(CONNECTED){ const {error}=await sb.from('tasks').update(taskToRow(t)).eq('id',id); if(error) fail(error); } },
   async deleteTask(id){ tasks=tasks.filter(t=>t.id!==id); emit();
-    if(CONNECTED){ const {error}=await sb.from('tasks').delete().eq('id',id); if(error) fail(error); } }
+    if(CONNECTED){ const {error}=await sb.from('tasks').delete().eq('id',id); if(error) fail(error); } },
+
+  // meeting note writes
+  async addNote(d){ const rec={...d};
+    if(CONNECTED){ const {data,error}=await sb.from('meeting_notes').insert(noteToRow(rec)).select().single();
+      if(error) return fail(error); notes.push(rowToNote(data)); }
+    else { notes.push({id:uid(),...rec}); } emit(); },
+  async updateNote(id,d){ const n=store.note(id); if(!n) return; Object.assign(n,d); emit();
+    if(CONNECTED){ const {error}=await sb.from('meeting_notes').update(noteToRow(n)).eq('id',id); if(error) fail(error); } },
+  async deleteNote(id){ notes=notes.filter(n=>n.id!==id); emit();
+    if(CONNECTED){ const {error}=await sb.from('meeting_notes').delete().eq('id',id); if(error) fail(error); } }
 };
 
 /* helpers */
@@ -551,6 +590,7 @@ function render(){
   if(view==='home') renderHome();
   else if(view==='calendar') renderCalendar();
   else if(view==='agenda') renderAgenda();
+  else if(view==='notes') renderNotes();
   else renderPipeline();
 }
 
@@ -726,7 +766,39 @@ function renderPipeline(){
   content.innerHTML='';content.appendChild(board);
 }
 
-/* ---------- Home (what's needed from each exec) ---------- */
+/* ---------- Meeting notes ---------- */
+function renderNotes(){
+  title.textContent='Meeting notes';
+  subtitle.textContent='Minutes and notes, newest first.';
+  topActions.innerHTML='';
+  topActions.appendChild(el(`<button class="btn btn-primary">${plusIcon()} New note</button>`))
+    .onclick=()=>openNote(null);
+
+  const list=store.notes().slice().sort((a,b)=>(b.date||b.created_at||'').localeCompare(a.date||a.created_at||''));
+  content.innerHTML='';
+  if(!list.length){
+    content.appendChild(el(`<div class="empty">${noteIcon()}<div>No notes yet. Click <b>New note</b> to capture minutes from a meeting.</div></div>`));
+    return;
+  }
+  const grid=el(`<div class="notegrid"></div>`);
+  list.forEach(n=>{
+    const ev=n.eventId?store.event(n.eventId):null;
+    const preview=(n.body||'').replace(/\s+/g,' ').trim();
+    const card=el(`<div class="notecard">
+      <div class="note-h">
+        <h4>${esc(n.title||'Untitled note')}</h4>
+        ${n.date?`<span class="note-date">${fmtDate(n.date)}</span>`:''}
+      </div>
+      ${ev?`<div class="note-link">${esc(ev.title)}</div>`:''}
+      <div class="note-body">${preview?esc(preview.slice(0,240))+(preview.length>240?'…':''):'<span class="note-empty">No content yet</span>'}</div>
+    </div>`);
+    card.onclick=()=>openNote(n.id);
+    grid.appendChild(card);
+  });
+  content.appendChild(grid);
+}
+
+
 function responsibilitiesFor(memberId){
   const tasks=[];
   store.events().forEach(ev=>{
@@ -1247,12 +1319,63 @@ function openTask(id){
   setTimeout(()=>m.querySelector('#t-text').focus(),40);
 }
 
+/* ----- meeting note modal ----- */
+function openNote(id){
+  const isNew=!id;
+  const n=id?{...store.note(id)}:{title:'',date:todayISO(),body:'',eventId:null};
+  const meetings=store.events().slice().sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+
+  const m=el(`<div class="modal">
+    <div class="modal-head"><h3>${isNew?'New meeting note':'Meeting note'}</h3><button class="x">${xIcon()}</button></div>
+    <div class="modal-body">
+      <div class="field"><label>Title</label><input id="n-title" placeholder="e.g. Exec board — October" value="${esc(n.title)}"></div>
+      <div class="row2">
+        <div class="field"><label>Date</label><input type="date" id="n-date" value="${n.date||''}"></div>
+        <div class="field"><label>Meeting (optional)</label>
+          <select id="n-event">
+            <option value="">— not linked —</option>
+            ${meetings.map(ev=>`<option value="${ev.id}" ${n.eventId===ev.id?'selected':''}>${esc(ev.title)} · ${fmtDate(ev.date)}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <div class="field"><label>Notes</label><textarea id="n-body" class="note-textarea" placeholder="Attendees, agenda, decisions, action items, follow-ups…">${esc(n.body||'')}</textarea></div>
+    </div>
+    <div class="modal-foot">
+      ${isNew?'<span></span>':'<button class="link-del" id="n-del">Delete note</button>'}
+      <div style="display:flex;gap:8px;margin-left:auto">
+        <button class="btn btn-ghost" id="n-cancel">Cancel</button>
+        <button class="btn btn-primary" id="n-save">${isNew?'Create note':'Save'}</button>
+      </div>
+    </div>
+  </div>`);
+
+  m.querySelector('.x').onclick=closeModal;
+  m.querySelector('#n-cancel').onclick=closeModal;
+  if(!isNew){ const db=m.querySelector('#n-del'); let armed=false,tm;
+    db.onclick=()=>{ if(!armed){armed=true;db.textContent='Click again to delete';db.classList.add('armed');
+      tm=setTimeout(()=>{armed=false;db.textContent='Delete note';db.classList.remove('armed');},3000);return;}
+      clearTimeout(tm);store.deleteNote(id);closeModal(); }; }
+  m.querySelector('#n-save').onclick=async()=>{
+    const data={
+      title:m.querySelector('#n-title').value.trim()||'Untitled note',
+      date:m.querySelector('#n-date').value||null,
+      eventId:m.querySelector('#n-event').value||null,
+      body:m.querySelector('#n-body').value,
+    };
+    if(isNew) await store.addNote(data); else await store.updateNote(id,data);
+    closeModal();
+  };
+  mount.innerHTML='';mount.appendChild(m);scrim.classList.add('open');
+  setTimeout(()=>m.querySelector('#n-title').focus(),40);
+}
+
 /* icons */
 function plusIcon(){return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>`;}
 function plusMini(){return `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M12 5v14M5 12h14"/></svg>`;}
 function chev(d){return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="${d==='l'?'M15 18l-6-6 6-6':'M9 18l6-6-6-6'}"/></svg>`;}
 function calIcon(){return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18M8 2v4M16 2v4"/></svg>`;}
 function peopleIcon(){return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3 2.5-5 6-5s6 2 6 5"/><circle cx="17" cy="9" r="2.2"/><path d="M15.5 14.5c2.5.4 4.5 2.3 4.5 5.5"/></svg>`;}
+function noteIcon(){return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 4h16v16H4z"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>`;}
 function checkIcon(){return `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg>`;}
 function xIcon(sz=18){return `<svg viewBox="0 0 24 24" width="${sz}" height="${sz}" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>`;}
 function esc(s){return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
