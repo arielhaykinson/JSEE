@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1223,11 +1224,20 @@ async function boot(){
     return;
   }
   if(!window.supabase){ toast('Could not load Supabase library'); return; }
-  sb=window.supabase.createClient(CONFIG.url,CONFIG.key);
+  sb=window.supabase.createClient(CONFIG.url,CONFIG.key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,flowType:'pkce'}});
   wireAuthUI();
+  // surface any OAuth error returned in the URL (so we don't bounce silently)
+  const qp=new URLSearchParams(window.location.search);
+  const hp=new URLSearchParams(window.location.hash.replace(/^#/,''));
+  const oErr=qp.get('error_description')||qp.get('error')||hp.get('error_description')||hp.get('error');
+  if(oErr){ showLogin(); auMsg(decodeURIComponent(oErr)); }
   sb.auth.onAuthStateChange((_e,session)=>{ if(session) startApp(); else { _appStarted=false; showLogin(); } });
-  const {data:{session}}=await sb.auth.getSession();
-  if(session) startApp(); else showLogin();
+  const {data:{session},error}=await sb.auth.getSession();
+  if(error){ showLogin(); auMsg(error.message); return; }
+  if(session){
+    startApp();
+    if(window.history && (window.location.search||window.location.hash)) history.replaceState({},'',window.location.pathname);
+  } else showLogin();
 }
 boot();
 </script>
