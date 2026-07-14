@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -52,10 +51,9 @@
   :root[data-theme="dark"] .tag.meeting{background:#15281f;color:#4fd3a0}
   :root[data-theme="dark"] .tag.social{background:#352c18;color:#e6b24a}
   :root[data-theme="dark"] .tag.exec{background:#241d3a;color:#b3a0f0}
-  .theme-btn{width:34px;height:34px;border-radius:9px;border:1px solid var(--line-strong);background:var(--surface);display:grid;place-items:center;color:var(--ink-soft);transition:.13s;flex:none}
-  .theme-btn:hover{color:var(--ink);border-color:var(--ink-faint);background:var(--surface-2)}
-  .theme-btn svg{width:17px;height:17px}
-  .topright{display:flex;align-items:center;gap:10px}
+  .side-toggle{display:flex;align-items:center;gap:11px;padding:10px 11px;margin-top:6px;border-radius:9px;color:#a6a9c4;font-weight:500;font-size:13.5px;text-align:left;transition:.13s;width:100%}
+  .side-toggle:hover{background:#22243a;color:#e6e7f2}
+  .side-toggle svg{width:17px;height:17px;flex:none}
   *{box-sizing:border-box;margin:0;padding:0}
   html,body{height:100%}
   body{font-family:var(--font);background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;font-size:14px;line-height:1.45}
@@ -389,6 +387,7 @@
         Find a time
       </button>
     </nav>
+    <button class="side-toggle" id="themeToggle" title="Toggle dark mode"></button>
     <div class="side-foot" id="sideFoot">
       <b>Frontend preview.</b> Data lives in this browser session for now — resets on reload. The store layer is built to swap for a shared backend next.
     </div>
@@ -401,10 +400,7 @@
         <h2 id="title">Home</h2>
         <div class="sub" id="subtitle">What's needed from each exec member.</div>
       </div>
-      <div class="topright">
-        <button id="themeToggle" class="theme-btn" title="Toggle dark mode" aria-label="Toggle dark mode"></button>
-        <div id="topActions"></div>
-      </div>
+      <div id="topActions"></div>
     </div>
     <div class="content" id="content"></div>
   </main>
@@ -1745,7 +1741,8 @@ async function boot(){
 const THEME_KEY='jsee-theme';
 function applyTheme(t){
   document.documentElement.setAttribute('data-theme', t==='dark'?'dark':'light');
-  const b=$('#themeToggle'); if(b) b.innerHTML = t==='dark' ? sunIcon() : moonIcon();
+  const b=$('#themeToggle');
+  if(b) b.innerHTML = (t==='dark'?sunIcon():moonIcon()) + `<span>${t==='dark'?'Light mode':'Dark mode'}</span>`;
 }
 (function initTheme(){
   let t='light'; try{ t=localStorage.getItem(THEME_KEY)||'light'; }catch(e){}
