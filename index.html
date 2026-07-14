@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -259,6 +258,39 @@
   .note-empty{color:var(--ink-faint);font-style:italic}
   .note-textarea{min-height:220px;resize:vertical;line-height:1.55;font-size:13.5px}
 
+  /* ---- availability polls ---- */
+  .pollcard{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px 20px;margin-bottom:16px}
+  .poll-h{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .poll-h h4{font-family:var(--display);font-size:17px;font-weight:600}
+  .poll-del{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;color:var(--ink-faint);flex:none}
+  .poll-del:hover{background:var(--s-declined-bg);color:var(--s-declined)}
+  .poll-del.armed{width:auto;padding:0 10px;font-size:11px;font-weight:700;background:var(--s-declined-bg);color:var(--s-declined)}
+  .poll-sub{font-size:12px;color:var(--ink-soft);margin:2px 0 14px}
+  .poll-opts{display:flex;flex-direction:column;gap:8px}
+  .poll-opt{display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--radius-sm);background:var(--surface-2)}
+  .poll-opt.best{border-color:var(--s-confirmed);background:var(--s-confirmed-bg)}
+  .poll-check{width:24px;height:24px;flex:none;display:grid;place-items:center;border:none;background:none;cursor:pointer}
+  .poll-check .ring{width:20px;height:20px;border-radius:6px;border:2px solid var(--line-strong);position:relative;transition:.12s}
+  .poll-check:hover .ring{border-color:var(--s-confirmed)}
+  .poll-check.on .ring{border-color:var(--s-confirmed);background:var(--s-confirmed)}
+  .poll-check.on .ring::after{content:'';position:absolute;left:5px;top:1px;width:5px;height:10px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg)}
+  .poll-opt-main{flex:1;min-width:0}
+  .poll-opt-top{display:flex;align-items:center;gap:10px}
+  .poll-slot{font-size:13.5px;font-weight:600}
+  .poll-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:var(--s-confirmed);color:#fff;text-transform:uppercase;letter-spacing:.03em}
+  .poll-count{margin-left:auto;font-size:12px;color:var(--ink-soft);font-weight:600;flex:none}
+  .poll-bar{height:5px;background:var(--line);border-radius:3px;margin:7px 0 5px;overflow:hidden}
+  .poll-bar span{display:block;height:100%;background:var(--s-confirmed);border-radius:3px;transition:width .2s}
+  .poll-who{font-size:11.5px;color:var(--ink-soft)}
+  .poll-who.none{color:var(--ink-faint);font-style:italic}
+  .poll-sched{flex:none;padding:7px 12px;font-size:12px}
+  .popt-edit{display:flex;align-items:center;gap:8px;padding:6px 0}
+  .popt-edit input[type=date]{flex:none}
+  .popt-edit input[type=text]{flex:1;padding:8px 10px;border:1px solid var(--line-strong);border-radius:8px}
+  .popt-edit input[type=date],.popt-edit input[type=time]{padding:8px;border:1px solid var(--line-strong);border-radius:8px;color:var(--ink-soft);font-size:12.5px}
+  .popt-edit .del{width:30px;height:30px;border-radius:7px;display:grid;place-items:center;color:var(--ink-faint);flex:none}
+  .popt-edit .del:hover{background:var(--s-declined-bg);color:var(--s-declined)}
+
   /* ---- login gate ---- */
   .authgate{position:fixed;inset:0;z-index:100;background:var(--bg);display:none;align-items:center;justify-content:center;padding:24px}
   .authgate.open{display:flex}
@@ -326,6 +358,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>
         Meeting notes
       </button>
+      <button data-view="schedule">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18M8 2v4M16 2v4"/><path d="M9 14l2 2 4-4"/></svg>
+        Find a time
+      </button>
     </nav>
     <div class="side-foot" id="sideFoot">
       <b>Frontend preview.</b> Data lives in this browser session for now — resets on reload. The store layer is built to swap for a shared backend next.
@@ -365,6 +401,10 @@
     <button data-view="notes">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>
       <span>Notes</span>
+    </button>
+    <button data-view="schedule">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18M8 2v4M16 2v4"/><path d="M9 14l2 2 4-4"/></svg>
+      <span>Time</span>
     </button>
   </nav>
 </div>
@@ -412,7 +452,7 @@ let sb = null;                 // supabase client (set in boot)
 let currentEmail = null;       // signed-in user's email (for "Mine" filter)
 let homeScope = 'all';         // 'all' | 'mine'
 let showDone = false;          // Home: reveal completed items
-let events=[], speakers=[], members=[], tasks=[], notes=[];
+let events=[], speakers=[], members=[], tasks=[], notes=[], polls=[];
 let _id=1; const uid=()=>'x'+(_id++);
 const emit=()=>document.dispatchEvent(new Event('store:change'));
 function fail(err){ console.error(err); toast('Could not save — check your connection'); }
@@ -428,6 +468,8 @@ const taskToRow   = t => ({body:t.t,done:!!t.done,owner:t.owner||null,cat:t.cat|
 const rowToTask   = r => ({id:r.id,t:r.body,done:r.done,owner:r.owner,cat:r.cat,due:r.due});
 const noteToRow   = n => ({title:n.title,note_date:n.date||null,body:n.body||null,event_id:n.eventId||null});
 const rowToNote   = r => ({id:r.id,title:r.title,date:r.note_date,body:r.body,eventId:r.event_id,created_at:r.created_at});
+const pollToRow   = p => ({title:p.title,options:p.options||[],votes:p.votes||{}});
+const rowToPoll   = r => ({id:r.id,title:r.title,options:r.options||[],votes:r.votes||{},created_at:r.created_at});
 
 async function loadAll(){
   const [ev,sp,me,ta] = await Promise.all([
@@ -441,15 +483,18 @@ async function loadAll(){
   speakers = (sp.data||[]).map(rowToSpeaker);
   members  = (me.data||[]).map(rowToMember);
   tasks    = (ta.data||[]).map(rowToTask);
-  // notes fetched separately so a missing table (before migration) doesn't break the app
+  // notes + polls fetched separately so a missing table (before migration) doesn't break the app
   try{ const nt=await sb.from('meeting_notes').select('*');
     notes = nt.error ? [] : (nt.data||[]).map(rowToNote);
   }catch(e){ notes=[]; }
+  try{ const pl=await sb.from('meeting_polls').select('*');
+    polls = pl.error ? [] : (pl.data||[]).map(rowToPoll);
+  }catch(e){ polls=[]; }
 }
 let _rtSubscribed=false;
 function subscribeRealtime(){
   if(_rtSubscribed) return; _rtSubscribed=true;
-  ['events','speakers','members','tasks','meeting_notes'].forEach(t=>{
+  ['events','speakers','members','tasks','meeting_notes','meeting_polls'].forEach(t=>{
     sb.channel('rt-'+t)
       .on('postgres_changes',{event:'*',schema:'public',table:t},async()=>{ await loadAll(); emit(); })
       .subscribe();
@@ -463,11 +508,13 @@ const store = {
   members: () => [...members],
   tasks: () => [...tasks],
   notes: () => [...notes],
+  polls: () => [...polls],
   event: id => events.find(e => e.id === id),
   speaker: id => speakers.find(s => s.id === id),
   member: id => members.find(mm => mm.id === id),
   task: id => tasks.find(t => t.id === id),
   note: id => notes.find(n => n.id === id),
+  poll: id => polls.find(p => p.id === id),
   eventsOn: iso => events.filter(e => e.date === iso),
 
   // event writes
@@ -532,7 +579,22 @@ const store = {
   async updateNote(id,d){ const n=store.note(id); if(!n) return; Object.assign(n,d); emit();
     if(CONNECTED){ const {error}=await sb.from('meeting_notes').update(noteToRow(n)).eq('id',id); if(error) fail(error); } },
   async deleteNote(id){ notes=notes.filter(n=>n.id!==id); emit();
-    if(CONNECTED){ const {error}=await sb.from('meeting_notes').delete().eq('id',id); if(error) fail(error); } }
+    if(CONNECTED){ const {error}=await sb.from('meeting_notes').delete().eq('id',id); if(error) fail(error); } },
+
+  // availability poll writes
+  async addPoll(d){ const rec={options:[],votes:{},...d};
+    if(CONNECTED){ const {data,error}=await sb.from('meeting_polls').insert(pollToRow(rec)).select().single();
+      if(error) return fail(error); polls.push(rowToPoll(data)); }
+    else { polls.push({id:uid(),...rec}); } emit(); },
+  async updatePoll(id,d){ const p=store.poll(id); if(!p) return; Object.assign(p,d); emit();
+    if(CONNECTED){ const {error}=await sb.from('meeting_polls').update(pollToRow(p)).eq('id',id); if(error) fail(error); } },
+  async deletePoll(id){ polls=polls.filter(p=>p.id!==id); emit();
+    if(CONNECTED){ const {error}=await sb.from('meeting_polls').delete().eq('id',id); if(error) fail(error); } },
+  async setVote(pollId,who,optionIndex,on){ const p=store.poll(pollId); if(!p) return;
+    const votes={...(p.votes||{})}; const cur=new Set(votes[who]||[]);
+    if(on) cur.add(optionIndex); else cur.delete(optionIndex);
+    votes[who]=[...cur].sort((a,b)=>a-b); p.votes=votes; emit();
+    if(CONNECTED){ const {error}=await sb.from('meeting_polls').update({votes}).eq('id',pollId); if(error) fail(error); } }
 };
 
 /* helpers */
@@ -591,6 +653,7 @@ function render(){
   else if(view==='calendar') renderCalendar();
   else if(view==='agenda') renderAgenda();
   else if(view==='notes') renderNotes();
+  else if(view==='schedule') renderSchedule();
   else renderPipeline();
 }
 
@@ -798,6 +861,83 @@ function renderNotes(){
   content.appendChild(grid);
 }
 
+/* ---------- Find a time (availability polls) ---------- */
+function currentIdentity(){
+  const me = currentEmail ? store.members().find(m=>m.email && m.email.toLowerCase()===currentEmail.toLowerCase()) : null;
+  return me?.name || currentEmail || 'You';
+}
+function slotLabel(o){
+  if(!o) return '';
+  const d = o.date ? fmtDate(o.date) : (o.note||'Option');
+  const t = o.time ? ' · '+fmtTime(o.time) : '';
+  return d + t + (o.date && o.note ? ' · '+o.note : (!o.date && o.time ? '' : ''));
+}
+function renderSchedule(){
+  title.textContent='Find a time';
+  subtitle.textContent='Propose times, let everyone check what works, then schedule the winner.';
+  topActions.innerHTML='';
+  topActions.appendChild(el(`<button class="btn btn-primary">${plusIcon()} New poll</button>`))
+    .onclick=()=>openPoll(null);
+
+  const me=currentIdentity();
+  const list=store.polls().slice().sort((a,b)=>(b.created_at||'').localeCompare(a.created_at||''));
+  content.innerHTML='';
+  if(!list.length){
+    content.appendChild(el(`<div class="empty">${clockIcon()}<div>No polls yet. Click <b>New poll</b> to propose a few times and see when everyone's free.</div></div>`));
+    return;
+  }
+
+  list.forEach(p=>{
+    const votes=p.votes||{};
+    const respondents=Object.keys(votes).filter(k=>(votes[k]||[]).length);
+    const counts=(p.options||[]).map((_,i)=>respondents.filter(r=>votes[r].includes(i)).length);
+    const best=Math.max(0,...counts);
+
+    const card=el(`<div class="pollcard">
+      <div class="poll-h">
+        <h4>${esc(p.title||'Untitled poll')}</h4>
+        <button class="poll-del" title="Delete poll">${xIcon(16)}</button>
+      </div>
+      <div class="poll-sub">${respondents.length} responded · you're voting as <b>${esc(me)}</b></div>
+      <div class="poll-opts"></div>
+    </div>`);
+
+    // delete (two-click)
+    const del=card.querySelector('.poll-del'); let armed=false,tm;
+    del.onclick=()=>{ if(!armed){armed=true;del.classList.add('armed');del.innerHTML='Delete?';
+      tm=setTimeout(()=>{armed=false;del.classList.remove('armed');del.innerHTML=xIcon(16);},3000);return;}
+      clearTimeout(tm);store.deletePoll(p.id); };
+
+    const opts=card.querySelector('.poll-opts');
+    (p.options||[]).forEach((o,i)=>{
+      const who=respondents.filter(r=>votes[r].includes(i));
+      const mine=(votes[me]||[]).includes(i);
+      const isBest=best>0 && counts[i]===best;
+      const pct=respondents.length?Math.round(counts[i]/respondents.length*100):0;
+      const row=el(`<div class="poll-opt ${isBest?'best':''}">
+        <button class="poll-check ${mine?'on':''}" title="I can make this"><span class="ring"></span></button>
+        <div class="poll-opt-main">
+          <div class="poll-opt-top">
+            <span class="poll-slot">${esc(slotLabel(o))}</span>
+            ${isBest?'<span class="poll-badge">Best</span>':''}
+            <span class="poll-count">${counts[i]} available</span>
+          </div>
+          <div class="poll-bar"><span style="width:${pct}%"></span></div>
+          ${who.length?`<div class="poll-who">${who.map(w=>esc(w)).join(', ')}</div>`:'<div class="poll-who none">no one yet</div>'}
+        </div>
+        ${o.date?`<button class="btn btn-ghost poll-sched">Schedule</button>`:''}
+      </div>`);
+      row.querySelector('.poll-check').onclick=()=>store.setVote(p.id,me,i,!mine);
+      const sched=row.querySelector('.poll-sched');
+      if(sched) sched.onclick=(e)=>{ e.stopPropagation();
+        store.addEvent({title:p.title||'Meeting',type:'meeting',date:o.date,time:o.time||'',location:'',status:'planning',
+          notes:'Scheduled from availability poll',tasks:[]});
+        toast('Added to the calendar'); };
+      opts.appendChild(row);
+    });
+    content.appendChild(card);
+  });
+}
 
 function responsibilitiesFor(memberId){
   const tasks=[];
@@ -1369,6 +1509,63 @@ function openNote(id){
   setTimeout(()=>m.querySelector('#n-title').focus(),40);
 }
 
+/* ----- availability poll modal ----- */
+function openPoll(id){
+  const isNew=!id;
+  const p=id?{...store.poll(id),options:[...(store.poll(id).options||[])]}:{title:'',options:[{date:'',time:'',note:''}],votes:{}};
+
+  const m=el(`<div class="modal">
+    <div class="modal-head"><h3>${isNew?'New availability poll':'Edit poll'}</h3><button class="x">${xIcon()}</button></div>
+    <div class="modal-body">
+      <div class="field"><label>What are we scheduling?</label><input id="p-title" placeholder="e.g. November exec board meeting" value="${esc(p.title)}"></div>
+      <div class="field"><label>Proposed times</label>
+        <div id="p-opts"></div>
+        <button class="col-add" id="p-addopt" style="margin-top:8px">+ Add a time option</button>
+      </div>
+    </div>
+    <div class="modal-foot">
+      ${isNew?'<span></span>':'<button class="link-del" id="p-del">Delete poll</button>'}
+      <div style="display:flex;gap:8px;margin-left:auto">
+        <button class="btn btn-ghost" id="p-cancel">Cancel</button>
+        <button class="btn btn-primary" id="p-save">${isNew?'Create poll':'Save'}</button>
+      </div>
+    </div>
+  </div>`);
+
+  const optWrap=m.querySelector('#p-opts');
+  function drawOpts(){
+    optWrap.innerHTML='';
+    p.options.forEach((o,i)=>{
+      const row=el(`<div class="popt-edit">
+        <input type="date" data-f="date" value="${o.date||''}">
+        <input type="time" data-f="time" value="${o.time||''}">
+        <input type="text" data-f="note" placeholder="note (optional)" value="${esc(o.note||'')}">
+        <button class="del" title="Remove">${xIcon(14)}</button>
+      </div>`);
+      row.querySelectorAll('input').forEach(inp=>{ inp.onchange=()=>{ p.options[i][inp.dataset.f]=inp.value; }; });
+      row.querySelector('.del').onclick=()=>{ p.options.splice(i,1); if(!p.options.length)p.options.push({date:'',time:'',note:''}); drawOpts(); };
+      optWrap.appendChild(row);
+    });
+  }
+  drawOpts();
+  m.querySelector('#p-addopt').onclick=()=>{ p.options.push({date:'',time:'',note:''}); drawOpts(); };
+
+  m.querySelector('.x').onclick=closeModal;
+  m.querySelector('#p-cancel').onclick=closeModal;
+  if(!isNew){ const db=m.querySelector('#p-del'); let armed=false,tm;
+    db.onclick=()=>{ if(!armed){armed=true;db.textContent='Click again to delete';db.classList.add('armed');
+      tm=setTimeout(()=>{armed=false;db.textContent='Delete poll';db.classList.remove('armed');},3000);return;}
+      clearTimeout(tm);store.deletePoll(id);closeModal(); }; }
+  m.querySelector('#p-save').onclick=async()=>{
+    const opts=p.options.filter(o=>o.date||o.note);   // drop empty rows
+    const data={ title:m.querySelector('#p-title').value.trim()||'Untitled poll', options:opts };
+    if(isNew){ data.votes={}; await store.addPoll(data); } else { await store.updatePoll(id,data); }
+    closeModal();
+  };
+  mount.innerHTML='';mount.appendChild(m);scrim.classList.add('open');
+  setTimeout(()=>m.querySelector('#p-title').focus(),40);
+}
+
 /* icons */
 function plusIcon(){return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>`;}
 function plusMini(){return `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M12 5v14M5 12h14"/></svg>`;}
@@ -1376,6 +1573,7 @@ function chev(d){return `<svg viewBox="0 0 24 24" fill="none" stroke="currentCol
 function calIcon(){return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18M8 2v4M16 2v4"/></svg>`;}
 function peopleIcon(){return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3 2.5-5 6-5s6 2 6 5"/><circle cx="17" cy="9" r="2.2"/><path d="M15.5 14.5c2.5.4 4.5 2.3 4.5 5.5"/></svg>`;}
 function noteIcon(){return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 4h16v16H4z"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>`;}
+function clockIcon(){return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>`;}
 function checkIcon(){return `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg>`;}
 function xIcon(sz=18){return `<svg viewBox="0 0 24 24" width="${sz}" height="${sz}" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>`;}
 function esc(s){return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
