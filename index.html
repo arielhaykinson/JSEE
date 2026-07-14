@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -27,6 +28,34 @@
     --shadow-lg:0 12px 48px rgba(20,23,38,.18);
     --font:'Inter',system-ui,sans-serif; --display:'Space Grotesk',system-ui,sans-serif;
   }
+  :root[data-theme="dark"]{
+    --bg:#0f1117; --surface:#171a22; --surface-2:#1e222c;
+    --ink:#e6e7ec; --ink-soft:#a3a7b6; --ink-faint:#6b6f80;
+    --line:#262a35; --line-strong:#343a48;
+    --primary:#5a68ff; --primary-soft:#212747; --primary-ink:#aab3ff;
+    --accent:#f0a316;
+    --s-idea:#9aa0b5; --s-idea-bg:#23262f;
+    --s-contacted:#e0a53a; --s-contacted-bg:#352c18;
+    --s-confirmed:#3fce9a; --s-confirmed-bg:#15281f;
+    --s-declined:#f06a80; --s-declined-bg:#331a20;
+    --s-done:#a3a7b6; --s-done-bg:#23262f;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.45);
+    --shadow-lg:0 12px 48px rgba(0,0,0,.6);
+  }
+  /* dark: sidebar uses --ink as its bg in light mode, so pin it dark here */
+  :root[data-theme="dark"] .side{background:#0b0d12}
+  :root[data-theme="dark"] #toast{background:#2a2f3c}
+  :root[data-theme="dark"] .cell.out{background:#14161d}
+  :root[data-theme="dark"] .ev.meeting{background:#15281f;color:#4fd3a0}
+  :root[data-theme="dark"] .ev.social{background:#352c18;color:#e6b24a}
+  :root[data-theme="dark"] .ev.exec{background:#241d3a;color:#b3a0f0}
+  :root[data-theme="dark"] .tag.meeting{background:#15281f;color:#4fd3a0}
+  :root[data-theme="dark"] .tag.social{background:#352c18;color:#e6b24a}
+  :root[data-theme="dark"] .tag.exec{background:#241d3a;color:#b3a0f0}
+  .theme-btn{width:34px;height:34px;border-radius:9px;border:1px solid var(--line-strong);background:var(--surface);display:grid;place-items:center;color:var(--ink-soft);transition:.13s;flex:none}
+  .theme-btn:hover{color:var(--ink);border-color:var(--ink-faint);background:var(--surface-2)}
+  .theme-btn svg{width:17px;height:17px}
+  .topright{display:flex;align-items:center;gap:10px}
   *{box-sizing:border-box;margin:0;padding:0}
   html,body{height:100%}
   body{font-family:var(--font);background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;font-size:14px;line-height:1.45}
@@ -372,7 +401,10 @@
         <h2 id="title">Home</h2>
         <div class="sub" id="subtitle">What's needed from each exec member.</div>
       </div>
-      <div id="topActions"></div>
+      <div class="topright">
+        <button id="themeToggle" class="theme-btn" title="Toggle dark mode" aria-label="Toggle dark mode"></button>
+        <div id="topActions"></div>
+      </div>
     </div>
     <div class="content" id="content"></div>
   </main>
@@ -1555,7 +1587,7 @@ function openPoll(id){
   const src=id?store.poll(id):null;
   const dates=id?[...(src.dates||[])]:[isoOffset(7)];
   // derive time window from existing times, else defaults
-  let startT='17:00', endT='20:00', step=30;
+  let startT='08:00', endT='22:00', step=30;
   if(src && (src.times||[]).length){
     startT=src.times[0]; endT=src.times[src.times.length-1];
     if(src.times.length>1) step=timeToMin(src.times[1])-timeToMin(src.times[0]);
@@ -1640,6 +1672,8 @@ function calIcon(){return `<svg viewBox="0 0 24 24" fill="none" stroke="currentC
 function peopleIcon(){return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3 2.5-5 6-5s6 2 6 5"/><circle cx="17" cy="9" r="2.2"/><path d="M15.5 14.5c2.5.4 4.5 2.3 4.5 5.5"/></svg>`;}
 function noteIcon(){return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 4h16v16H4z"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>`;}
 function clockIcon(){return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>`;}
+function moonIcon(){return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>`;}
+function sunIcon(){return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/></svg>`;}
 function checkIcon(){return `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg>`;}
 function xIcon(sz=18){return `<svg viewBox="0 0 24 24" width="${sz}" height="${sz}" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>`;}
 function esc(s){return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
@@ -1707,6 +1741,20 @@ async function boot(){
     if(window.history && (window.location.search||window.location.hash)) history.replaceState({},'',window.location.pathname);
   } else showLogin();
 }
+/* theme (dark mode) */
+const THEME_KEY='jsee-theme';
+function applyTheme(t){
+  document.documentElement.setAttribute('data-theme', t==='dark'?'dark':'light');
+  const b=$('#themeToggle'); if(b) b.innerHTML = t==='dark' ? sunIcon() : moonIcon();
+}
+(function initTheme(){
+  let t='light'; try{ t=localStorage.getItem(THEME_KEY)||'light'; }catch(e){}
+  applyTheme(t);
+  const b=$('#themeToggle');
+  if(b) b.onclick=()=>{ const cur=document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark';
+    try{ localStorage.setItem(THEME_KEY,cur); }catch(e){} applyTheme(cur); };
+})();
+
 boot();
 </script>
 </body>
