@@ -273,8 +273,8 @@
   .tgrid th.tdate .tdow{display:block;font-size:11px;font-weight:700;color:var(--ink);text-transform:uppercase;letter-spacing:.02em}
   .tgrid th.tdate .tdm{display:block;font-size:10.5px;color:var(--ink-faint);font-weight:500}
   .tgrid td.tlabel{font-size:10.5px;color:var(--ink-soft);font-weight:600;text-align:right;padding-right:6px;white-space:nowrap;width:56px}
-  .tcell{width:100%;min-width:0;height:30px;border:1px solid var(--line);border-radius:6px;background:var(--surface-2);cursor:pointer;font-size:11px;font-weight:700;color:var(--ink);transition:transform .06s}
-  .tcell:hover{transform:scale(1.06);border-color:var(--ink-faint)}
+  .tcell{width:100%;min-width:0;height:30px;border:1px solid var(--line);border-radius:6px;background:var(--surface-2);cursor:pointer;font-size:11px;font-weight:700;color:var(--ink);transition:border-color .1s;text-shadow:0 0 2px rgba(255,255,255,.6)}
+  .tcell:hover{border-color:var(--ink)}
   .tcell.mine{outline:2px solid var(--primary);outline-offset:-2px}
   .tcell.best{box-shadow:0 0 0 2px var(--s-confirmed)}
   .poll-best{margin-top:14px;border-top:1px solid var(--line);padding-top:12px}
@@ -933,9 +933,9 @@ function renderSchedule(){
         const id=d+'|'+t;
         const c=cellCount(id);
         const mine=(votes[me]||[]).includes(id);
-        const alpha=R?(c/R):0;
+        const alpha=R?Math.min(0.8,(c/R)*0.8):0;
         const isBest=bestCount>0 && c===bestCount;
-        const td=el(`<td><button class="tcell ${mine?'mine':''} ${isBest?'best':''}" data-cell="${id}" title="${c} of ${R} free" style="background:rgba(31,157,107,${alpha.toFixed(2)})">${c||''}</button></td>`);
+        const td=el(`<td><button class="tcell ${mine?'mine':''} ${isBest?'best':''}" data-cell="${id}" title="${c} of ${R} free" style="background:rgba(31,157,107,${alpha.toFixed(2)});color:${alpha>0.5?'#fff':'var(--ink-soft)'}">${c||''}</button></td>`);
         tr.appendChild(td);
       });
       tbody.appendChild(tr);
@@ -992,14 +992,14 @@ function dueFlag(iso){
 // unified list of OPEN to-dos (event action items + standalone tasks)
 function openTodos(){
   const out=[];
-  store.events().forEach(ev=>(ev.tasks||[]).forEach((t,i)=>{ if(!t.done) out.push({t:t.t,date:ev.date,owner:t.owner,kind:'event',event:ev,idx:i,cat:t.cat,done:false}); }));
-  store.tasks().forEach(t=>{ if(!t.done) out.push({t:t.t,date:t.due||null,owner:t.owner,kind:'solo',cat:t.cat,task:t,done:false}); });
+  store.events().forEach(ev=>(ev.tasks||[]).forEach((t,i)=>{ if(!t.done && (t.t||'').trim()) out.push({t:t.t,date:ev.date,owner:t.owner,kind:'event',event:ev,idx:i,cat:t.cat,done:false}); }));
+  store.tasks().forEach(t=>{ if(!t.done && (t.t||'').trim()) out.push({t:t.t,date:t.due||null,owner:t.owner,kind:'solo',cat:t.cat,task:t,done:false}); });
   return out;
 }
 function doneTodos(){
   const out=[];
-  store.events().forEach(ev=>(ev.tasks||[]).forEach((t,i)=>{ if(t.done) out.push({t:t.t,date:ev.date,owner:t.owner,kind:'event',event:ev,idx:i,cat:t.cat,done:true}); }));
-  store.tasks().forEach(t=>{ if(t.done) out.push({t:t.t,date:t.due||null,owner:t.owner,kind:'solo',cat:t.cat,task:t,done:true}); });
+  store.events().forEach(ev=>(ev.tasks||[]).forEach((t,i)=>{ if(t.done && (t.t||'').trim()) out.push({t:t.t,date:ev.date,owner:t.owner,kind:'event',event:ev,idx:i,cat:t.cat,done:true}); }));
+  store.tasks().forEach(t=>{ if(t.done && (t.t||'').trim()) out.push({t:t.t,date:t.due||null,owner:t.owner,kind:'solo',cat:t.cat,task:t,done:true}); });
   return out;
 }
 
@@ -1092,12 +1092,12 @@ function renderHome(){
   };
   const buildMemberCard=(mm)=>{
     const {owned}=responsibilitiesFor(mm.id);
-    const openCount=allOpen.filter(o=>o.owner===mm.id).length + owned.filter(s=>s.stage!=='done').length;
+    const taskCount=allOpen.filter(o=>o.owner===mm.id).length;
     const card=el(`<div class="mcard">
       <div class="mcard-head">
         <span class="av" style="width:40px;height:40px;font-size:15px;background:${avatarColor(mm.id)}">${esc(initials(mm.name))}</span>
         <div class="mcard-id"><h4>${esc(mm.name)}</h4><span>${esc(mm.role||'')}</span></div>
-        <div class="mcard-counts">${openCount?`<span class="pill open">${openCount} to do</span>`:`<span class="pill clear">Clear</span>`}</div>
+        <div class="mcard-counts">${taskCount?`<span class="pill open">${taskCount} to do</span>`:`<span class="pill clear">Clear</span>`}</div>
         <button class="madd" title="Add a task for ${esc(mm.name)}">${plusMini()}</button>
       </div>
       <div class="madder">
@@ -1156,7 +1156,7 @@ function renderHome(){
       <div class="mcard-head">
         <span class="av av-none" style="width:40px;height:40px;font-size:15px">?</span>
         <div class="mcard-id"><h4>Unassigned</h4><span>Needs an owner</span></div>
-        <div class="mcard-counts"><span class="pill open">${unTodos.length+unSpeakers.length} to do</span></div>
+        <div class="mcard-counts"><span class="pill open">${unTodos.length} to do</span></div>
       </div>
       <div class="mcard-body"></div>
     </div>`);
